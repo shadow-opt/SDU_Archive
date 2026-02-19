@@ -19,3 +19,5 @@ def test_embed_text_returns_fixed_length():
     # deterministic fallback: same input -> same vector
     again = asyncio.run(embed_text("hello world"))
     assert result == again
+    different = asyncio.run(embed_text("another text"))
+    assert result != different

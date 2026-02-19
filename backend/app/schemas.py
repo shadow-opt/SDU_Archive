@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 
 class Token(BaseModel):
@@ -21,16 +21,15 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     email: EmailStr
     role: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     title: str
     filename: str
@@ -39,24 +38,19 @@ class DocumentOut(BaseModel):
     description: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class ChunkUpdate(BaseModel):
     content: str
 
 
 class ChunkOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     document_id: uuid.UUID
     content: str
     source_url: str
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class RagQuery(BaseModel):
@@ -82,13 +76,11 @@ class QuestionCreate(BaseModel):
 
 
 class QuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     prompt: str
     options: List[str]
     points: int
-
-    class Config:
-        from_attributes = True
 
 
 class QuestionSubmit(BaseModel):
