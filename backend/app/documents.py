@@ -41,6 +41,10 @@ async def upload_document(
     if len(contents) > 100 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 100MB)")
 
+    allowed_prefixes = ("text/", "image/")
+    if not any((file.content_type or "").startswith(prefix) for prefix in allowed_prefixes):
+        raise HTTPException(status_code=400, detail="仅支持文本或图片文件")
+
     object_name = f"{uuid.uuid4()}-{file.filename}"
     upload_file(object_name, io.BytesIO(contents), length=len(contents), content_type=file.content_type or "application/octet-stream")
 
