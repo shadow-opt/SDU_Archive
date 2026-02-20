@@ -58,7 +58,17 @@ async def update_chunk(
     db.add(chunk)
     db.commit()
     db.refresh(chunk)
-    return chunk
+    return ChunkOut(
+        id=chunk.id,
+        document_id=chunk.document_id,
+        content=chunk.content,
+        source_url=chunk.source_url,
+        document_title=chunk.document.title if chunk.document else None,
+        char_count=len(chunk.content),
+        token_count=max(1, len(chunk.content) // 4),
+        created_at=chunk.created_at,
+        updated_at=chunk.updated_at,
+    )
 
 
 @router.delete("/{chunk_id}")

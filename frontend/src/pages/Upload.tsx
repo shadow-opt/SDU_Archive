@@ -97,8 +97,8 @@ export default function Upload() {
       setDescription('');
       setYearOrPeriod('');
       setDocType('');
-    } catch (err: any) {
-      setStatus(err.message);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : '上传失败');
     } finally {
       setUploading(false);
     }

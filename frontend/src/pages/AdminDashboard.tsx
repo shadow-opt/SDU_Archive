@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import useSWR from 'swr';
 import {
   Bar,
@@ -112,7 +113,7 @@ export default function AdminDashboard() {
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{ fontSize: '12px' }}
-                    labelFormatter={(value) => `题目: ${String(value).slice(0, 30)}...`}
+                    labelFormatter={(label: ReactNode) => `题目: ${String(label ?? '').slice(0, 30)}...`}
                   />
                   <Bar dataKey="wrong_count" fill="#9C0C13" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -166,7 +167,7 @@ export default function AdminDashboard() {
                   <YAxis tick={{ fontSize: 12 }} />
                   <Tooltip
                     contentStyle={{ fontSize: '12px' }}
-                    labelFormatter={(value) => String(value)}
+                    labelFormatter={(label: ReactNode) => String(label ?? '')}
                   />
                   <Bar dataKey="total_points" fill="#9C0C13" radius={[4, 4, 0, 0]} />
                 </BarChart>

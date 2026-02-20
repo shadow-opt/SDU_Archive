@@ -45,8 +45,8 @@ export default function AdminLogin() {
 
       setStatus('登录成功');
       navigate('/admin/dashboard');
-    } catch (err: any) {
-      setStatus(err.message);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : '登录失败');
     }
   };
 

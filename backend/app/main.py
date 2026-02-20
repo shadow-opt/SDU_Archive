@@ -1,4 +1,6 @@
 import uuid
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -12,7 +14,20 @@ from .utils.security import get_password_hash
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    Base.metadata.create_all(bind=engine)
+    run_compat_migrations()
+    with get_session() as db:
+        ensure_admin(db)
+    yield
+    # Shutdown (nothing needed)
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 
 # Parse CORS origins from comma-separated string
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -83,12 +98,3 @@ def run_compat_migrations():
     with engine.begin() as conn:
         for statement in statements:
             conn.execute(text(statement))
-
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    Base.metadata.create_all(bind=engine)
-    run_compat_migrations()
-    with get_session() as db:
-        ensure_admin(db)

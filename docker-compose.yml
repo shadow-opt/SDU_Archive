@@ -41,10 +41,10 @@ services:
       MINIO_SECRET_KEY: minioadmin
       MINIO_SECURE: "false"
       MINIO_BUCKET: documents
-      SECRET_KEY: change-me
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env or environment}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      ADMIN_EMAIL: admin@example.com
-      ADMIN_PASSWORD: admin123
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin12345678}
     depends_on:
       db:
         condition: service_healthy

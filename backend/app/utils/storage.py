@@ -1,3 +1,4 @@
+import io
 import os
 from pathlib import Path
 from typing import BinaryIO
@@ -38,7 +39,7 @@ def save_bytes(object_name: str, data: bytes, content_type: str) -> str:
     client.put_object(
         settings.minio_bucket,
         object_name,
-        data=data,
+        data=io.BytesIO(data),
         length=len(data),
         content_type=content_type,
     )

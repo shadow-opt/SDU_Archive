@@ -2,9 +2,9 @@
 set -euo pipefail
 
 API_URL="${API_BASE_URL:-http://localhost:${API_HOST_PORT:-18000}}"
-FRONTEND_URL="${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_HOST_PORT:-8080}}"
+FRONTEND_URL="${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_HOST_PORT:-18080}}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345678}"
 
 echo "[1/11] health check: ${API_URL}/api/health"
 curl -fsS "${API_URL}/api/health" >/dev/null

@@ -15,14 +15,24 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 settings = get_settings()
 
 rate_cache: Dict[str, tuple[int, float]] = {}
+_last_cleanup: float = 0.0
 
 
 def rate_limiter(request: Request):
+    global _last_cleanup
     now = time.time()
     ip = request.client.host if request.client else "unknown"
     key = f"{ip}"
-    count, start = rate_cache.get(key, (0, now))
     window = 60.0
+
+    # Periodic cleanup of expired entries to prevent memory leak
+    if now - _last_cleanup > window:
+        expired_keys = [k for k, (_, start) in rate_cache.items() if now - start >= window]
+        for k in expired_keys:
+            del rate_cache[k]
+        _last_cleanup = now
+
+    count, start = rate_cache.get(key, (0, now))
     if now - start >= window:
         count, start = 0, now
     count += 1

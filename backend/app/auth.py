@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -17,7 +17,7 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     existing = db.query(User).filter(User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
-    user = User(email=user_in.email, password_hash=get_password_hash(user_in.password), role="user", created_at=datetime.utcnow())
+    user = User(email=user_in.email, password_hash=get_password_hash(user_in.password), role="user", created_at=datetime.now(timezone.utc))
     db.add(user)
     db.commit()
     db.refresh(user)

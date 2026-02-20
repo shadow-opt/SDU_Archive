@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import case, func
@@ -21,7 +21,7 @@ def get_dashboard_summary(db: Session = Depends(get_db), _: User = Depends(requi
     ).scalar()
     average_accuracy = round(float(average_accuracy_raw or 0) * 100, 2)
 
-    today_start = datetime.combine(datetime.utcnow().date(), time.min)
+    today_start = datetime.combine(datetime.now(timezone.utc).date(), time.min, tzinfo=timezone.utc)
     today_points = db.query(func.sum(AnswerRecord.points_awarded)).filter(AnswerRecord.created_at >= today_start).scalar() or 0
 
     wrong_rows = (

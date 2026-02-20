@@ -53,8 +53,8 @@ export default function Home() {
       localStorage.setItem('token', data.access_token);
       setToken(data.access_token);
       setStatus('登录成功，现在可以检索了');
-    } catch (err: any) {
-      setStatus(err.message || '认证失败');
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : '认证失败');
     }
   };
 
