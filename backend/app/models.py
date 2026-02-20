@@ -16,10 +16,12 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(32), default="user", nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     documents = relationship("Document", back_populates="uploader")
     submissions = relationship("QuizSubmission", back_populates="user")
+    answer_records = relationship("AnswerRecord", back_populates="user")
     score = relationship("UserScore", uselist=False, back_populates="user")
 
 
@@ -32,6 +34,8 @@ class Document(Base):
     content_type: Mapped[str] = mapped_column(String(128), nullable=False)
     object_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    year_or_period: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    doc_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     uploader_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
@@ -60,11 +64,14 @@ class QuizQuestion(Base):
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     options: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     correct_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    question_type: Mapped[str] = mapped_column(String(32), default="single_choice", nullable=False)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     points: Mapped[int] = mapped_column(Integer, default=1)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
 
     submissions = relationship("QuizSubmission", back_populates="question")
+    answer_records = relationship("AnswerRecord", back_populates="question")
 
 
 class QuizSubmission(Base):
@@ -82,11 +89,28 @@ class QuizSubmission(Base):
     question = relationship("QuizQuestion", back_populates="submissions")
 
 
+class AnswerRecord(Base):
+    __tablename__ = "answer_records"
+    __table_args__ = (UniqueConstraint("user_id", "question_id", name="uq_answer_record_user_question"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quiz_questions.id"), nullable=False, index=True)
+    selected_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    is_correct: Mapped[bool] = mapped_column(Boolean, default=False)
+    points_awarded: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+
+    user = relationship("User", back_populates="answer_records")
+    question = relationship("QuizQuestion", back_populates="answer_records")
+
+
 class UserScore(Base):
     __tablename__ = "user_scores"
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
     total_points: Mapped[int] = mapped_column(Integer, default=0)
+    total_answers: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="score")
