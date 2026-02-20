@@ -33,6 +33,8 @@ def split_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]
 async def upload_document(
     title: str = Form(...),
     description: str | None = Form(None),
+    year_or_period: str | None = Form(None),
+    doc_type: str | None = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -54,6 +56,8 @@ async def upload_document(
         content_type=file.content_type or "application/octet-stream",
         object_name=object_name,
         description=description,
+        year_or_period=year_or_period,
+        doc_type=doc_type,
         uploader_id=current_user.id,
     )
     db.add(document)
