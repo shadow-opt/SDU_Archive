@@ -149,6 +149,7 @@ class SubmissionResult(BaseModel):
     awarded: int
     total_points: int
     total_answers: int
+    explanation: Optional[str] = None
 
 
 class DashboardKpi(BaseModel):

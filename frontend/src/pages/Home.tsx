@@ -10,6 +10,7 @@ export default function Home() {
   const [answer, setAnswer] = useState('');
   const [citations, setCitations] = useState<{ source: string; snippet: string }[]>([]);
   const [status, setStatus] = useState('');
+  const [isAnswerExpanded, setIsAnswerExpanded] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('token');
@@ -97,6 +98,7 @@ export default function Home() {
       const data = await res.json();
       setAnswer(data.answer);
       setCitations(data.citations || []);
+      setIsAnswerExpanded(false);
       setStatus('');
     } catch (err) {
       setStatus('查询失败，请稍后重试');
@@ -188,10 +190,30 @@ export default function Home() {
       )}
 
       {answer && (
-        <div className="w-full text-left bg-white p-8 rounded-2xl shadow-sm border border-ink-dark/5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="w-full text-left bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-ink-dark/5 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-serif font-bold mb-4 text-ink-dark">AI 回答</h3>
           <div className="prose prose-stone max-w-none mb-8 text-ink-dark/80 leading-relaxed">
-            {answer}
+            <div className={`${!isAnswerExpanded && answer.length > 500 ? 'line-clamp-6 md:line-clamp-none' : ''}`}>
+              {answer}
+            </div>
+            {!isAnswerExpanded && answer.length > 500 && (
+              <button
+                type="button"
+                onClick={() => setIsAnswerExpanded(true)}
+                className="mt-2 text-sdu-red hover:underline text-sm md:hidden"
+              >
+                展开全文 ▼
+              </button>
+            )}
+            {isAnswerExpanded && answer.length > 500 && (
+              <button
+                type="button"
+                onClick={() => setIsAnswerExpanded(false)}
+                className="mt-2 text-sdu-red hover:underline text-sm md:hidden"
+              >
+                收起 ▲
+              </button>
+            )}
           </div>
           
           {citations.length > 0 && (
@@ -200,7 +222,18 @@ export default function Home() {
               <ul className="space-y-4">
                 {citations.map((cit, idx) => (
                   <li key={idx} className="text-sm bg-paper-bg p-4 rounded-lg border border-ink-dark/5">
-                    <span className="font-medium text-sdu-red block mb-1">{cit.source}</span>
+                    {cit.source.startsWith('http') ? (
+                      <a
+                        href={cit.source}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-medium text-sdu-red hover:underline block mb-1"
+                      >
+                        {cit.source}
+                      </a>
+                    ) : (
+                      <span className="font-medium text-sdu-red block mb-1">{cit.source}</span>
+                    )}
                     <span className="text-ink-light line-clamp-3">{cit.snippet}</span>
                   </li>
                 ))}

@@ -99,11 +99,21 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="h-64 mb-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.wrong_questions} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <BarChart data={data.wrong_questions} margin={{ top: 8, right: 8, bottom: 20, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="prompt" tickFormatter={(value: string | number) => String(value).slice(0, 8)} />
-                  <YAxis />
-                  <Tooltip />
+                  <XAxis
+                    dataKey="prompt"
+                    tickFormatter={(value: string | number) => String(value).slice(0, 8)}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ fontSize: '12px' }}
+                    labelFormatter={(value) => `题目: ${String(value).slice(0, 30)}...`}
+                  />
                   <Bar dataKey="wrong_count" fill="#9C0C13" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -143,11 +153,21 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="h-64 mb-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.top_users} margin={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <BarChart data={data.top_users} margin={{ top: 8, right: 8, bottom: 20, left: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="email" tickFormatter={(value: string | number) => String(value).split('@')[0].slice(0, 8)} />
-                  <YAxis />
-                  <Tooltip />
+                  <XAxis
+                    dataKey="email"
+                    tickFormatter={(value: string | number) => String(value).split('@')[0].slice(0, 8)}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ fontSize: '12px' }}
+                    labelFormatter={(value) => String(value)}
+                  />
                   <Bar dataKey="total_points" fill="#9C0C13" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

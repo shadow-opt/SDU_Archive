@@ -165,4 +165,10 @@ def submit_answer(
         raise HTTPException(status_code=400, detail="Already answered")
     db.refresh(score)
 
-    return SubmissionResult(correct=is_correct, awarded=awarded, total_points=score.total_points, total_answers=score.total_answers)
+    return SubmissionResult(
+        correct=is_correct,
+        awarded=awarded,
+        total_points=score.total_points,
+        total_answers=score.total_answers,
+        explanation=question.explanation
+    )

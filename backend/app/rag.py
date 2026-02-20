@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from .deps import get_current_user, get_db, rate_limiter
 from .models import Chunk
 from .schemas import RagQuery, RagResponse, RagCitation
-from .utils.embedding import embed_text
+from .utils.embedding import embed_text, generate_answer
 
 router = APIRouter(prefix="/api/rag", tags=["rag"], dependencies=[Depends(rate_limiter)])
 
@@ -26,11 +26,17 @@ async def query_rag(
         return RagResponse(answer="暂无记载", citations=[])
 
     citations: list[RagCitation] = []
-    snippets = []
+    context_parts = []
     for chunk in results:
         snippet = chunk.content[:200]
         citations.append(RagCitation(source=chunk.source_url, snippet=snippet))
-        snippets.append(snippet)
+        # Use full content for context, not just snippet
+        context_parts.append(chunk.content)
 
-    answer_text = "\n".join(snippets)
+    # Combine context from all chunks
+    context = "\n\n".join(context_parts)
+
+    # Generate AI answer using LLM
+    answer_text = await generate_answer(payload.query, context)
+
     return RagResponse(answer=answer_text, citations=citations)

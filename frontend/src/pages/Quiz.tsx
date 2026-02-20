@@ -17,6 +17,7 @@ export default function Quiz() {
   const [status, setStatus] = useState('');
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
 
   const token = getAuthToken();
 
@@ -61,8 +62,9 @@ export default function Quiz() {
         return;
       }
 
-      const data = (await res.json()) as { correct: boolean; awarded: number; total_points: number };
+      const data = (await res.json()) as { correct: boolean; awarded: number; total_points: number; explanation?: string };
       setScore(data.total_points);
+      setExplanation(data.explanation || null);
       setStatus(data.correct ? `回答正确，+${data.awarded}分` : '回答错误');
     } catch {
       setStatus('提交失败，请稍后重试');
@@ -147,6 +149,12 @@ export default function Quiz() {
       )}
       {score !== null && (
         <div className="mt-2 text-sm text-green-700">当前累计积分：{score}</div>
+      )}
+      {explanation && (
+        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">题目解析</h4>
+          <p className="text-sm text-blue-800">{explanation}</p>
+        </div>
       )}
     </div>
   );
