@@ -38,11 +38,12 @@ docker compose up --build
 - `DATABASE_URL`：Postgres 连接串，默认 `postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive`。
 - `MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY/MINIO_BUCKET`：对象存储配置，默认内置 MinIO。
 - `SECRET_KEY`：JWT 签名密钥。
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD`：启动时自动创建的超级管理员。
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD`：启动时自动创建的超级管理员（**生产环境请务必修改默认密码**）。
 - `RATE_LIMIT_PER_MINUTE`：后端漏桶限流阈值，默认 60。
+- `CORS_ORIGINS`：允许的跨域来源，默认 `http://localhost:18080,http://localhost:3000`。
 
 ## 操作指南
-1) **登录/注册**：前端首页点击“登录/注册”，输入邮箱与密码；默认管理员账号 `admin@example.com / admin123`（请务必修改）。
+1) **登录/注册**：前端首页点击"登录/注册"，输入邮箱与密码。若使用默认管理员账号，请在首次部署后立即修改密码。
 2) **史实问答**：登录后在“史实问答”区域输入问题，返回回答与引用来源；无命中则提示“暂无记载”。
 3) **上传档案**：在“档案上传”选择文本或图片文件（<=100MB），填写标题/描述，提交后将自动切片入库并生成向量。
 4) **互动题库**：在“互动题库”选择题目并作答，系统判分并累计积分；同一题目不可重复作答。
