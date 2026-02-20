@@ -108,7 +108,7 @@ newgrp docker
 3. 创建新的 API key
 4. 保存 key（格式：`sk-...`）
 
-**成本预估**（使用 gpt-4o-mini）：
+**成本预估**（使用 gpt-4o-mini 示例）：
 - 每次查询：约 $0.0001-0.0003
 - 1000次查询：约 $0.10-0.30
 - 月活100用户，平均每天10次查询：约 $3-9/月
@@ -126,9 +126,12 @@ cp .env.example .env
 # 必需：用于AI问答和语义搜索
 OPENAI_API_KEY=sk-your-api-key-here
 
-# 可选：LLM模型选择（默认 gpt-4o-mini）
-# 选项: gpt-4o-mini（推荐，性价比高）, gpt-4o（质量最高）, gpt-3.5-turbo（最便宜但已过时）
-OPENAI_MODEL=gpt-4o-mini
+# 可选：LLM模型选择（默认 gpt-4o，更可靠）
+# 选项: gpt-4o（质量优先，默认）, gpt-4o-mini（性价比高）, gpt-3.5-turbo（最便宜但已过时）
+OPENAI_MODEL=gpt-4o
+
+# 可选：兼容 OpenAI 协议的第三方/自托管地址
+OPENAI_BASE_URL=
 
 # ========== 安全配置 ==========
 # 必须修改：JWT签名密钥（生成随机字符串）
@@ -240,7 +243,8 @@ docker compose ps
 | 变量名 | 必需 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `OPENAI_API_KEY` | 是* | - | OpenAI API密钥，用于AI功能 |
-| `OPENAI_MODEL` | 否 | `gpt-4o-mini` | LLM模型选择 |
+| `OPENAI_MODEL` | 否 | `gpt-4o` | LLM模型选择 |
+| `OPENAI_BASE_URL` | 否 | - | 兼容 OpenAI 协议的第三方/自托管地址 |
 | `SECRET_KEY` | 是 | `change-me` | JWT签名密钥（生产环境必须修改） |
 | `ADMIN_EMAIL` | 否 | `admin@example.com` | 默认管理员邮箱 |
 | `ADMIN_PASSWORD` | 否 | `admin123` | 默认管理员密码 |
@@ -251,8 +255,8 @@ docker compose ps
 
 | 模型 | 发布时间 | 输入价格 | 输出价格 | 特点 | 推荐场景 |
 |------|----------|----------|----------|------|----------|
-| **gpt-4o-mini** | 2024.07 | $0.15/1M tokens | $0.60/1M tokens | **推荐**：性价比最高，质量好 | 生产环境首选 |
-| gpt-4o | 2024.05 | $5.00/1M tokens | $15.00/1M tokens | 质量最高，速度快 | 高质量要求场景 |
+| **gpt-4o** | 2024.05 | $5.00/1M tokens | $15.00/1M tokens | 质量更高、鲁棒性好 | 默认推荐，质量优先 |
+| gpt-4o-mini | 2024.07 | $0.15/1M tokens | $0.60/1M tokens | 成本低，质量次之 | 成本敏感场景 |
 | gpt-3.5-turbo | 2023.03 | $0.50/1M tokens | $1.50/1M tokens | 已过时，不推荐 | 不推荐 |
 
 ### 端口配置

@@ -41,7 +41,8 @@ docker compose up --build
 
 ### 环境变量（可在 docker-compose 或 `.env` 中配置）
 - `OPENAI_API_KEY`（可选）：用于语义嵌入和AI回答生成。未配置时使用哈希向量（仅演示）。
-- `OPENAI_MODEL`（可选）：LLM模型选择，默认 `gpt-4o-mini`（推荐），可选 `gpt-4o`、`gpt-3.5-turbo`。
+- `OPENAI_MODEL`（可选）：LLM模型选择，默认 `gpt-4o`（更可靠），可选 `gpt-4o-mini`、`gpt-3.5-turbo`。
+- `OPENAI_BASE_URL`（可选）：兼容 OpenAI 协议的自托管/第三方地址，留空则使用官方 `api.openai.com`。
 - `DATABASE_URL`：Postgres 连接串，默认 `postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive`。
 - `MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY/MINIO_BUCKET`：对象存储配置，默认内置 MinIO。
 - `SECRET_KEY`：JWT 签名密钥（**生产环境必须修改**）。
