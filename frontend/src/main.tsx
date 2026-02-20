@@ -12,6 +12,7 @@ import Upload from './pages/Upload'
 import RagChunks from './pages/RagChunks'
 import QuizManager from './pages/QuizManager'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminUsers from './pages/AdminUsers'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="chunks" element={<RagChunks />} />
           <Route path="rag-chunks" element={<RagChunks />} />
           <Route path="quiz-manager" element={<QuizManager />} />
+          <Route path="users" element={<AdminUsers />} />
         </Route>
       </Routes>
     </BrowserRouter>

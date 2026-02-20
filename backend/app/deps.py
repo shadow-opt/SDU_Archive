@@ -51,6 +51,8 @@ def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Annotate
     user = db.get(User, user_uuid)
     if not user:
         raise credentials_exception
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
     return user
 
 

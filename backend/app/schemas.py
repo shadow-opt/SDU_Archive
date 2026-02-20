@@ -25,7 +25,36 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: EmailStr
     role: str
+    is_active: bool
     created_at: datetime
+
+
+class UserAdminOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    email: EmailStr
+    role: str
+    is_active: bool
+    created_at: datetime
+
+
+class UserListResponse(BaseModel):
+    items: List[UserAdminOut]
+    total: int
+    skip: int
+    limit: int
+
+
+class UserRoleUpdate(BaseModel):
+    role: str
+
+
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+
+class UserPasswordReset(BaseModel):
+    new_password: str = Field(min_length=8)
 
 
 class DocumentOut(BaseModel):

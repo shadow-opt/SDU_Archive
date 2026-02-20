@@ -6,13 +6,13 @@ FRONTEND_URL="${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_HOST_PORT:-8080}}
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin123}"
 
-echo "[1/8] health check: ${API_URL}/api/health"
+echo "[1/11] health check: ${API_URL}/api/health"
 curl -fsS "${API_URL}/api/health" >/dev/null
 
-echo "[2/8] frontend check: ${FRONTEND_URL}"
+echo "[2/11] frontend check: ${FRONTEND_URL}"
 curl -fsSI "${FRONTEND_URL}" | head -n 1 >/dev/null
 
-echo "[3/8] unauth RAG must be 401"
+echo "[3/11] unauth RAG must be 401"
 rag_code=$(curl -s -o /tmp/sdu_rag_unauth.out -w "%{http_code}" \
   -X POST "${API_URL}/api/rag/query" \
   -H "Content-Type: application/json" \
@@ -23,7 +23,7 @@ if [[ "${rag_code}" != "401" ]]; then
   exit 1
 fi
 
-echo "[4/8] admin login + /me role check"
+echo "[4/11] admin login + /me role check"
 login_json=$(curl -fsS -X POST "${API_URL}/api/auth/login" \
   -F "username=${ADMIN_EMAIL}" \
   -F "password=${ADMIN_PASSWORD}")
@@ -52,16 +52,54 @@ if [[ "${role}" != "admin" ]]; then
   exit 1
 fi
 
-echo "[5/8] admin endpoint check: /api/chunks"
+echo "[5/11] admin endpoint check: /api/chunks"
 curl -fsS "${API_URL}/api/chunks?limit=1" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[6/8] admin chunk search endpoint"
+echo "[6/11] admin chunk search endpoint"
 curl -fsS "${API_URL}/api/chunks?limit=1&q=test" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[7/8] admin dashboard summary"
+echo "[7/11] admin dashboard summary"
 curl -fsS "${API_URL}/api/admin/dashboard" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[8/8] admin quiz create + delete"
+echo "[8/11] user register for user-management checks"
+test_user_email="smoke_user_$(date +%s)@example.com"
+test_user_password="smoke12345"
+register_code=$(curl -s -o /tmp/sdu_smoke_register.out -w "%{http_code}" \
+  -X POST "${API_URL}/api/auth/register" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"${test_user_email}\",\"password\":\"${test_user_password}\"}")
+if [[ "${register_code}" != "200" ]]; then
+  echo "ERROR: user register failed, code=${register_code}" >&2
+  cat /tmp/sdu_smoke_register.out >&2 || true
+  exit 1
+fi
+
+echo "[9/11] admin users list endpoint"
+list_json=$(curl -fsS "${API_URL}/api/admin/users?limit=100" -H "Authorization: Bearer ${token}")
+test_user_id=$(python3 - <<'PY' "$list_json" "$test_user_email"
+import json,sys
+payload=json.loads(sys.argv[1])
+target=sys.argv[2]
+for item in payload.get('items',[]):
+    if item.get('email')==target:
+        print(item.get('id',''))
+        break
+else:
+    print('')
+PY
+)
+if [[ -z "${test_user_id}" ]]; then
+  echo "ERROR: user-management list did not return created user" >&2
+  exit 1
+fi
+
+echo "[10/11] admin user status toggle"
+curl -fsS -X PATCH "${API_URL}/api/admin/users/${test_user_id}/status" \
+  -H "Authorization: Bearer ${token}" \
+  -H "Content-Type: application/json" \
+  -d '{"is_active":false}' >/dev/null
+
+echo "[11/11] admin quiz create + delete"
 create_json=$(curl -fsS -X POST "${API_URL}/api/quiz/questions" \
   -H "Authorization: Bearer ${token}" \
   -H "Content-Type: application/json" \

@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from . import auth, documents, rag, chunks, quiz, dashboard
+from . import auth, documents, rag, chunks, quiz, dashboard, admin_users
 from .config import get_settings
 from .database import Base, engine, init_db, get_session
 from .models import User
@@ -28,6 +28,7 @@ app.include_router(chunks.router)
 app.include_router(rag.router)
 app.include_router(quiz.router)
 app.include_router(dashboard.router)
+app.include_router(admin_users.router)
 
 
 @app.get("/api/health")
@@ -54,6 +55,7 @@ def run_compat_migrations():
         return
 
     statements = [
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE",
         "ALTER TABLE documents ADD COLUMN IF NOT EXISTS year_or_period VARCHAR(64)",
         "ALTER TABLE documents ADD COLUMN IF NOT EXISTS doc_type VARCHAR(64)",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type VARCHAR(32) NOT NULL DEFAULT 'single_choice'",

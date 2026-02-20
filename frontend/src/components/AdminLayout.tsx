@@ -35,6 +35,7 @@ export default function AdminLayout() {
           <NavLink to="/admin/upload" className={navClass}>档案上传</NavLink>
           <NavLink to="/admin/chunks" className={navClass}>切片管理</NavLink>
           <NavLink to="/admin/quiz-manager" className={navClass}>题库管理</NavLink>
+          <NavLink to="/admin/users" className={navClass}>用户管理</NavLink>
         </nav>
         <div className="p-4 border-t border-white/10">
           <div className="text-sm text-white/60 mb-2 truncate">{user.email}</div>
