@@ -1,6 +1,9 @@
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 WORKDIR /app
 COPY frontend/package*.json ./
+RUN npm config set fetch-retries 5 \
+	&& npm config set fetch-retry-maxtimeout 120000 \
+	&& npm config set fetch-timeout 120000
 RUN npm ci
 COPY frontend ./
 RUN npm run build

@@ -1,5 +1,4 @@
 
-
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -8,11 +7,12 @@ services:
       POSTGRES_PASSWORD: sdu
       POSTGRES_DB: sdu_archive
     ports:
-      - "5433:5432"
+      - "${POSTGRES_HOST_PORT:-15433}:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sdu"]
+      test: ["CMD-SHELL", "pg_isready -U sdu -d sdu_archive"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -24,10 +24,11 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9002:9000"
-      - "9003:9001"
+      - "${MINIO_API_PORT:-19002}:9000"
+      - "${MINIO_CONSOLE_PORT:-19003}:9001"
     volumes:
       - minio_data:/data
+    restart: unless-stopped
 
   api:
     build:
@@ -50,16 +51,24 @@ services:
       minio:
         condition: service_started
     ports:
-      - "8000:8000"
+      - "${API_HOST_PORT:-18000}:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "8080:80"
+      - "${FRONTEND_HOST_PORT:-18080}:80"
+    restart: unless-stopped
     depends_on:
-      - api
+      api:
+        condition: service_healthy
 
 volumes:
   db_data:

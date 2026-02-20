@@ -2,6 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from .deps import get_db, rate_limiter, require_admin
 from .models import Chunk
@@ -15,10 +16,15 @@ router = APIRouter(prefix="/api/chunks", tags=["chunks"], dependencies=[Depends(
 def list_chunks(
     skip: int = 0,
     limit: int = Query(default=50, le=200),
+    q: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    return db.query(Chunk).offset(skip).limit(limit).all()
+    query = db.query(Chunk)
+    if q:
+                like_pattern = f"%{q}%"
+                query = query.filter(or_(Chunk.content.ilike(like_pattern), Chunk.source_url.ilike(like_pattern)))
+    return query.order_by(Chunk.updated_at.desc()).offset(skip).limit(limit).all()
 
 
 @router.patch("/{chunk_id}", response_model=ChunkOut)

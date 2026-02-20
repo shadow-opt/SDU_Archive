@@ -31,6 +31,16 @@ def create_question(payload: QuestionCreate, db: Session = Depends(get_db), _: s
     return q
 
 
+@router.delete("/questions/{question_id}")
+def delete_question(question_id: uuid.UUID, db: Session = Depends(get_db), _: str = Depends(require_admin)):
+    question = db.get(QuizQuestion, question_id)
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+    db.delete(question)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/questions/{question_id}/submit", response_model=SubmissionResult)
 def submit_answer(
     question_id: uuid.UUID,
