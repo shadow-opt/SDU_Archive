@@ -1,4 +1,4 @@
-# 升级总结：GPT-4o-mini + 完整部署指南
+# 升级总结：GPT-4o 默认 + 完整部署指南
 
 > 注：当前默认模型已切换为 `gpt-4o`（稳定性优先），`gpt-4o-mini` 作为可选的低成本方案，仍可通过 `OPENAI_MODEL` 配置。
 
@@ -13,9 +13,9 @@
 
 ### 1. LLM模型升级 ✅
 
-**从 gpt-3.5-turbo 升级到 gpt-4o-mini**
+**从 gpt-3.5-turbo 升级到 gpt-4o / gpt-4o-mini**
 
-| 对比项 | gpt-3.5-turbo (旧) | gpt-4o-mini (新) |
+| 对比项 | gpt-3.5-turbo (旧) | gpt-4o / gpt-4o-mini (新) |
 |--------|-------------------|------------------|
 | 发布时间 | 2023年3月 | 2024年7月 |
 | 技术水平 | 已过时 | **最新高效模型** |
@@ -69,11 +69,11 @@ async def generate_answer(query: str, context: str) -> str:
 #### ✅ 配置灵活性
 现在支持通过环境变量配置模型：
 ```env
-# 默认使用 gpt-4o-mini（推荐）
-OPENAI_MODEL=gpt-4o-mini
-
-# 需要更高质量时使用 gpt-4o
+# 默认使用 gpt-4o（稳定性优先，可按需改为 gpt-4o-mini）
 OPENAI_MODEL=gpt-4o
+
+# 需要进一步控制成本时使用 gpt-4o-mini
+OPENAI_MODEL=gpt-4o-mini
 
 # 或继续使用旧模型（不推荐）
 OPENAI_MODEL=gpt-3.5-turbo
@@ -171,7 +171,7 @@ docker compose up --build
 ### 后端代码
 1. **backend/app/config.py**
    - 新增 `openai_model` 配置项
-   - 默认值：`gpt-4o-mini`
+   - 默认值：`gpt-4o`
 
 2. **backend/app/utils/embedding.py**
    - 升级模型到 `settings.openai_model`（可配置）
@@ -181,7 +181,7 @@ docker compose up --build
 ### 配置文件
 3. **.env.example**
    - 添加 `OPENAI_MODEL` 配置说明
-   - 说明模型选择：gpt-4o-mini（推荐）、gpt-4o、gpt-3.5-turbo
+   - 说明模型选择：gpt-4o（默认，质量优先）、gpt-4o-mini（低成本）、gpt-3.5-turbo（过时）
 
 4. **README.md**
    - 添加"默认管理员账号"章节（非常显眼）
@@ -201,7 +201,7 @@ docker compose up --build
 ## 向后兼容性
 
 ✅ **100% 向后兼容**：
-- 不设置 `OPENAI_MODEL` 时自动使用 `gpt-4o-mini`（更好的默认值）
+- 不设置 `OPENAI_MODEL` 时自动使用 `gpt-4o`（更稳的默认值）
 - 所有现有配置继续有效
 - 无需修改代码，仅需重新部署
 
@@ -209,24 +209,24 @@ docker compose up --build
 
 ### 方法1：使用默认配置（推荐）
 ```bash
-# 不设置 OPENAI_MODEL，自动使用 gpt-4o-mini
+# 不设置 OPENAI_MODEL，自动使用 gpt-4o
 docker compose up --build
 ```
 
 ### 方法2：显式配置
 ```bash
 # 在 .env 文件中添加
-OPENAI_MODEL=gpt-4o-mini
+OPENAI_MODEL=gpt-4o
 
 # 或通过环境变量
-export OPENAI_MODEL=gpt-4o-mini
+export OPENAI_MODEL=gpt-4o
 docker compose up --build
 ```
 
-### 方法3：使用更高质量模型
+### 方法3：使用更低成本模型
 ```env
-# 需要最高质量时
-OPENAI_MODEL=gpt-4o
+# 需要控制成本时
+OPENAI_MODEL=gpt-4o-mini
 ```
 
 ## 成本优化示例
@@ -239,7 +239,7 @@ OPENAI_MODEL=gpt-4o
 月度成本 ≈ $9-15
 ```
 
-### 使用 gpt-4o-mini（新）
+### 使用 gpt-4o / gpt-4o-mini（新）
 ```
 查询成本 = (输入tokens * $0.15 + 输出tokens * $0.60) / 1,000,000
 月度成本 ≈ $3-6  ⬇️ 节省60%
@@ -249,7 +249,7 @@ OPENAI_MODEL=gpt-4o
 
 ## 质量提升
 
-gpt-4o-mini 相比 gpt-3.5-turbo 的改进：
+gpt-4o / gpt-4o-mini 相比 gpt-3.5-turbo 的改进：
 - ✅ 更好的中文理解和生成能力
 - ✅ 更准确的指令遵循（更少偏离档案内容）
 - ✅ 更自然的表达（更像人类回答）
@@ -280,8 +280,8 @@ open http://localhost:18080
 ### 2. 模型切换测试
 ```bash
 # 测试不同模型
-OPENAI_MODEL=gpt-4o-mini docker compose up --build
 OPENAI_MODEL=gpt-4o docker compose up --build
+OPENAI_MODEL=gpt-4o-mini docker compose up --build
 ```
 
 ### 3. 降级测试
@@ -296,7 +296,7 @@ docker compose up --build
 
 ✅ **所有要求已完成**：
 
-1. ✅ **模型升级**：从过时的 gpt-3.5-turbo → 最新的 gpt-4o-mini
+1. ✅ **模型升级**：从过时的 gpt-3.5-turbo → 默认 gpt-4o（可选 gpt-4o-mini 控制成本）
 2. ✅ **实现审查**：全面审查代码，确认可靠性
 3. ✅ **部署指南**：创建680+行的完整文档（DEPLOYMENT.md）
 4. ✅ **管理员凭证**：在 README 中明确显示
@@ -315,4 +315,4 @@ docker compose up --build
 - **.env.example** - 环境变量模板
 - **AI_QA_FIX.md** - AI问答系统修复说明（之前创建）
 
-现在系统使用的是2024年最新的 gpt-4o-mini 模型，质量更好，成本更低，配置更灵活！
+现在系统默认使用质量更高的 gpt-4o，亦可切换到 gpt-4o-mini 在控制成本的同时保持较好体验！
