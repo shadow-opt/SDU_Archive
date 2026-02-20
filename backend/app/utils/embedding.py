@@ -39,6 +39,8 @@ async def generate_answer(query: str, context: str) -> str:
     """
     Generate a natural language answer using LLM based on the query and retrieved context.
     Falls back to returning context directly if OpenAI API key is not configured.
+
+    Uses gpt-4o-mini by default (configurable via OPENAI_MODEL env var).
     """
     if not settings.openai_api_key:
         # Fallback: return context as-is
@@ -66,7 +68,7 @@ async def generate_answer(query: str, context: str) -> str:
 请基于以上档案内容回答用户的问题。"""
 
         payload = {
-            "model": "gpt-3.5-turbo",
+            "model": settings.openai_model,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
@@ -81,6 +83,8 @@ async def generate_answer(query: str, context: str) -> str:
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
 
-    except Exception:
+    except Exception as e:
+        # Log error for debugging (in production, use proper logging)
+        print(f"LLM generation error: {e}")
         # On error, fallback to returning context
         return context

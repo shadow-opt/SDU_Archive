@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     minio_bucket: str = "documents"
     embedding_provider: str = "openai"
     openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"  # Default to latest efficient model
     rate_limit_per_minute: int = 60
     admin_email: str | None = None
     admin_password: str | None = None

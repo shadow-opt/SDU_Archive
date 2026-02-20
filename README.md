@@ -19,7 +19,7 @@
 
 ## 部署指南
 1) 准备 Docker 与 docker-compose。
-2) 可选：在环境中导出 `OPENAI_API_KEY`（有语义嵌入需求时）。
+2) 可选：在环境中导出 `OPENAI_API_KEY`（有语义嵌入与AI问答需求时）。
 3) 启动：
 ```bash
 docker compose up --build
@@ -31,22 +31,31 @@ docker compose up --build
 - MinIO API（宿主机映射）：`http://localhost:19002`（可用 `MINIO_API_PORT` 覆盖）
 - MinIO Console（宿主机映射）：`http://localhost:19003`（可用 `MINIO_CONSOLE_PORT` 覆盖）
 
+### 默认管理员账号
+**邮箱**: `admin@example.com`
+**密码**: `admin123`
+
+> ⚠️ **重要安全提示**：首次部署后请立即修改默认管理员密码！可通过环境变量 `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 自定义。
+
 > 说明：公开检索页面需要先登录后才能发起查询请求。
 
 ### 环境变量（可在 docker-compose 或 `.env` 中配置）
-- `OPENAI_API_KEY`（可选）：存在则使用真实嵌入。
+- `OPENAI_API_KEY`（可选）：用于语义嵌入和AI回答生成。未配置时使用哈希向量（仅演示）。
+- `OPENAI_MODEL`（可选）：LLM模型选择，默认 `gpt-4o-mini`（推荐），可选 `gpt-4o`、`gpt-3.5-turbo`。
 - `DATABASE_URL`：Postgres 连接串，默认 `postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive`。
 - `MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY/MINIO_BUCKET`：对象存储配置，默认内置 MinIO。
-- `SECRET_KEY`：JWT 签名密钥。
+- `SECRET_KEY`：JWT 签名密钥（**生产环境必须修改**）。
 - `ADMIN_EMAIL` / `ADMIN_PASSWORD`：启动时自动创建的超级管理员（**生产环境请务必修改默认密码**）。
 - `RATE_LIMIT_PER_MINUTE`：后端漏桶限流阈值，默认 60。
 - `CORS_ORIGINS`：允许的跨域来源，默认 `http://localhost:18080,http://localhost:3000`。
 
+> 💡 **完整配置指南**：参见 [DEPLOYMENT.md](DEPLOYMENT.md)
+
 ## 操作指南
-1) **登录/注册**：前端首页点击"登录/注册"，输入邮箱与密码。若使用默认管理员账号，请在首次部署后立即修改密码。
-2) **史实问答**：登录后在“史实问答”区域输入问题，返回回答与引用来源；无命中则提示“暂无记载”。
-3) **上传档案**：在“档案上传”选择文本或图片文件（<=100MB），填写标题/描述，提交后将自动切片入库并生成向量。
-4) **互动题库**：在“互动题库”选择题目并作答，系统判分并累计积分；同一题目不可重复作答。
+1) **登录/注册**：前端首页点击"登录/注册"，输入邮箱与密码。默认管理员账号见上方。
+2) **史实问答（AI RAG）**：登录后在"史实问答"区域输入问题，AI将基于档案内容生成回答并提供引用来源；无命中则提示"暂无记载"。
+3) **上传档案**：在"档案上传"选择文本或图片文件（<=100MB），填写标题/描述，提交后将自动切片入库并生成向量。
+4) **互动题库**：在"互动题库"选择题目并作答，系统判分并累计积分；同一题目不可重复作答。
 5) **管理员入口**：
    - 创建题目：输入题干、选项、正确序号与分值后提交。
    - 切片修订：支持按关键词搜索、分页加载、编辑并重嵌入，也可直接删除错误切片。
