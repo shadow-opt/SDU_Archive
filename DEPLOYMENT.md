@@ -1,656 +1,467 @@
-# SDU Archive 部署与配置完整指南
+# 🚀 零基础网站搭建指南
 
-## 目录
-- [系统要求](#系统要求)
-- [快速开始](#快速开始)
-- [详细部署步骤](#详细部署步骤)
-- [环境变量配置](#环境变量配置)
-- [生产环境部署](#生产环境部署)
-- [故障排查](#故障排查)
-- [性能优化](#性能优化)
-- [备份与恢复](#备份与恢复)
+> 这是一份专为「会写代码，但从没搭过网站」的开发者准备的保姆级教程。
+>
+> 在本地开发时，你的网站只在你的电脑上跑；**部署（Deployment）** 就是把代码放到一台"永远不关机、24 小时联网"的远程电脑（服务器）上，让全世界都能通过网址访问。
+>
+> 不用紧张，跟着这份指南一步步走就好。
 
-## 系统要求
+---
 
-### 硬件要求
-- **最小配置**：2GB RAM，10GB 磁盘空间
-- **推荐配置**：4GB RAM，20GB 磁盘空间
-- **CPU**：2核心或以上
+## 📑 目录
 
-### 软件要求
-- Docker 20.10+
-- Docker Compose 2.0+
-- （可选）域名和SSL证书（生产环境）
+| 步骤 | 内容 | 预计耗时 |
+|:---:|------|:---:|
+| 一 | [选购与购买服务器](#一选购与购买服务器) | 10 分钟 |
+| 二 | [首次连接服务器（SSH）](#二首次连接服务器ssh) | 5 分钟 |
+| 三 | [服务器安全加固](#三服务器安全加固) | 15 分钟 |
+| 四 | [安装 Docker](#四安装-docker) | 5 分钟 |
+| 五 | [部署网站](#五部署网站) | 10 分钟 |
+| 六 | [域名与 HTTPS（可选）](#六域名与-https可选) | 30+ 分钟 |
 
-### 支持的操作系统
-- Linux (Ubuntu 20.04+, CentOS 8+, Debian 11+)
-- macOS 11+
-- Windows 10/11 (WSL2)
+---
 
-## 快速开始
+## 前置知识速览
 
-### 1. 克隆仓库
+在正式开始之前，先花两分钟了解几个你马上会遇到的概念：
+
+| 概念 | 一句话解释 |
+|------|-----------|
+| **服务器** | 一台放在机房、不关机的 Linux 电脑，你通过网络远程控制它。 |
+| **公网 IP** | 服务器在互联网上的"门牌号"，比如 `123.45.67.89`。 |
+| **端口（Port）** | 一台电脑可以同时运行很多服务，端口就是用来区分它们的编号（0~65535）。网页默认用 80（HTTP）和 443（HTTPS）。 |
+| **SSH** | 一种加密的远程连接协议，让你在自己电脑的终端里操作服务器，就像坐在服务器面前一样。 |
+| **Docker** | 把代码和运行环境一起打包成"集装箱（容器）"的工具。不用在服务器上手动装 Python、Node.js、数据库，Docker 帮你全搞定，保证"我这能跑，服务器上也能跑"。 |
+| **域名** | 用来代替 IP 地址的人类友好名称，比如 `www.example.com`。 |
+| **HTTPS / SSL** | 给你的网站加一把"锁"，浏览器地址栏会显示 🔒，数据传输全程加密。 |
+| **备案** | 中国大陆的政策要求：如果你的服务器在国内，绑定的域名**必须**完成工信部备案才能正常访问。海外服务器**不需要**备案。 |
+
+---
+
+## 一、选购与购买服务器
+
+### 你需要什么配置？
+
+本项目包含前端、后端 API、PostgreSQL 数据库和 MinIO 对象存储四个组件，推荐配置：
+
+| 项目 | 最低要求 | 推荐 |
+|------|---------|------|
+| CPU | 2 核 | 2 核及以上 |
+| 内存 | 2 GB | **4 GB** |
+| 硬盘 | 40 GB SSD | 60 GB SSD |
+| 操作系统 | Ubuntu 22.04 / 24.04 LTS | 同左 |
+| 带宽 | 3 Mbps | 5 Mbps 及以上 |
+
+### 选哪家？——两条路线
+
+> **核心决策点**：你的域名是否需要备案？
+
+| | 🇨🇳 国内路线（阿里云） | 🌍 海外路线（无需备案） |
+|---|---|---|
+| **服务商推荐** | [阿里云 轻量应用服务器](https://www.aliyun.com/product/swas) | [Vultr](https://www.vultr.com/)、[DigitalOcean](https://www.digitalocean.com/)、[Racknerd](https://www.racknerd.com/)（性价比高） |
+| **优点** | 国内访问速度快；中文客服；长期包年有折扣 | **不需要域名备案**；注册简单；部署即可绑定域名 |
+| **缺点** | 绑定域名需要完成备案（通常 5~15 个工作日）；只用 IP+端口访问则不需要备案 | 国内用户访问可能稍慢（选日本/新加坡/香港节点可缓解） |
+| **适合场景** | 面向国内用户的正式网站 | 个人项目、学习用途、不想折腾备案 |
+
+### 阿里云轻量应用服务器购买步骤
+
+1. 前往 [阿里云官网](https://www.aliyun.com/) 注册账号并完成**实名认证**。
+2. 搜索「轻量应用服务器」，点击购买。
+3. 配置选择：
+   - **地域**：选离目标用户最近的城市（如"华东1 杭州"或"华北2 北京"）。
+   - **镜像**：系统镜像 → **Ubuntu 22.04** 或 **24.04**。
+   - **套餐**：2 核 4G 起步。
+   - **时长**：新用户通常有包年特惠，按需选择。
+4. 购买完成后，进入控制台 → 找到你的服务器 → 记下 **公网 IP 地址**。
+5. 在控制台点击「重置密码」，为 `root` 用户设置一个**高强度密码**（大小写字母+数字+特殊字符）并妥善保存。
+
+### 海外服务商购买步骤（以 Vultr 为例）
+
+1. 前往 [Vultr](https://www.vultr.com/) 注册账号。
+2. 点击右上角 **Deploy +** → **Cloud Compute**。
+3. 配置选择：
+   - **Server Location**：选择 Tokyo（东京）或 Singapore（新加坡），对国内延迟较低。
+   - **Image**：Ubuntu 22.04 或 24.04 LTS。
+   - **Plan**：选择至少 2 核 4GB 内存的方案。
+4. 点击 **Deploy Now**，等待几分钟服务器就绑上线了。
+5. 在控制面板找到你的服务器，记下 **IP Address** 和 **Password**。
+
+---
+
+## 二、首次连接服务器（SSH）
+
+无论你选了哪家服务商，接下来的操作都是一样的——通过 SSH 远程登录服务器。
+
+### Windows 用户
+
+打开 **PowerShell**（在开始菜单搜索 `PowerShell`），输入：
+
 ```bash
+ssh root@你的服务器公网IP
+```
+
+> 例如：`ssh root@123.45.67.89`
+
+### macOS / Linux 用户
+
+打开 **终端（Terminal）**，输入同样的命令：
+
+```bash
+ssh root@你的服务器公网IP
+```
+
+### 首次连接的注意事项
+
+1. 系统会提示：`Are you sure you want to continue connecting (yes/no)?`  
+   输入 **`yes`** 然后回车。
+2. 接下来输入你在购买服务器时设置的 **root 密码**。  
+   ⚠️ **输入密码时屏幕不会显示任何字符**，这是 Linux 的安全设计，不是卡了——直接输完回车即可。
+3. 当你看到类似 `root@server:~#` 的提示符时，恭喜你，**你已经登上服务器了**！
+
+> 💡 **小技巧**：如果每次输密码很烦，之后可以搜索「SSH 密钥登录」来配置免密登录。
+
+---
+
+## 三、服务器安全加固
+
+服务器暴露在公网上，全球的自动扫描器会 24 小时不停地试探。以下几步是**最基本的安全措施**，强烈建议完成。
+
+### 3.1 系统更新
+
+```bash
+apt update && apt upgrade -y
+```
+
+> 这条命令会把服务器上所有系统软件更新到最新版本，修复已知的安全漏洞。
+
+### 3.2 创建普通用户（不再用 root 裸奔）
+
+`root` 是服务器的"上帝账户"，权限无限大。日常操作建议使用一个普通用户，降低误操作风险：
+
+```bash
+# 创建一个名为 deploy 的新用户（名字可以自己取）
+adduser deploy
+
+# 赋予它 sudo（临时管理员）权限
+usermod -aG sudo deploy
+```
+
+> 之后你就可以用 `ssh deploy@你的服务器IP` 登录了。需要管理员权限时，在命令前加 `sudo` 即可。
+
+### 3.3 配置防火墙（UFW）
+
+防火墙的作用：**只让你允许的端口对外开放，其余一概拒绝。**
+
+```bash
+# 允许 SSH（22端口）—— 不开这个你会把自己锁在门外！
+ufw allow 22
+
+# 允许 HTTP（80）和 HTTPS（443）—— 网页访问用
+ufw allow 80
+ufw allow 443
+
+# 允许项目用到的端口
+ufw allow 18080   # 前端
+ufw allow 18000   # 后端 API
+
+# 启用防火墙（输入 y 确认）
+ufw enable
+
+# 查看当前规则，确认无误
+ufw status
+```
+
+### 3.4 阿里云用户额外步骤：安全组 / 防火墙
+
+阿里云除了服务器内部的 UFW，在**云平台层面**还有一道独立的防火墙（叫"安全组"或"防火墙"）。你需要去**阿里云控制台**也放行相同的端口：
+
+1. 登录阿里云控制台 → 进入你的轻量应用服务器。
+2. 左侧菜单找到「防火墙」或「安全 → 安全组」。
+3. 添加规则，放行以下端口：
+
+| 端口 | 用途 |
+|------|------|
+| 22 | SSH 远程连接 |
+| 80 | HTTP 网页访问 |
+| 443 | HTTPS 网页访问 |
+| 18080 | 本项目前端 |
+| 18000 | 本项目后端 API |
+
+> ⚠️ **千万不要忘记这一步！** 很多新手在服务器里配好了一切，浏览器却打不开，90% 的原因就是云平台的安全组没放行端口。
+
+---
+
+## 四、安装 Docker
+
+### 什么是 Docker？为什么需要它？
+
+本项目包含 4 个组件：
+
+| 组件 | 说明 |
+|------|------|
+| **frontend** | React 前端，由 Nginx 托管 |
+| **api** | Python FastAPI 后端 |
+| **db** | PostgreSQL 数据库 + pgvector 向量检索 |
+| **minio** | MinIO 对象存储（存用户上传的文件） |
+
+如果不用 Docker，你需要手动安装 Nginx、Python、PostgreSQL、MinIO，还要操心版本兼容问题。有了 Docker，一条命令就能把这四个组件全部启动。
+
+### 安装命令
+
+在服务器终端依次执行：
+
+```bash
+# 下载 Docker 官方安装脚本并执行
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+```
+
+安装完成后验证一下：
+
+```bash
+docker --version
+# 输出类似：Docker version 27.x.x, build xxxxxxx 说明成功
+```
+
+> 💡 **国内服务器拉取 Docker 镜像很慢？** 可以搜索「Docker 镜像加速器 阿里云」来配置加速，显著提升下载速度。
+
+---
+
+## 五、部署网站
+
+终于到了最激动人心的一步！
+
+### 5.1 安装 Git 并下载代码
+
+```bash
+apt update && apt install git -y
+
+# 下载项目代码
 git clone https://github.com/shadow-opt/SDU_Archive.git
+
+# 进入项目文件夹
 cd SDU_Archive
 ```
 
-### 2. 配置环境变量（可选）
+### 5.2 配置环境变量
+
+环境变量是程序运行时读取的"配置项"，用来存放密钥、密码等敏感信息。项目已经提供了一个模板文件：
+
 ```bash
-# 复制环境变量模板
+# 复制模板
 cp .env.example .env
 
-# 编辑配置文件（至少配置 OPENAI_API_KEY）
+# 用 nano 编辑器打开（新手友好的终端文本编辑器）
 nano .env
 ```
 
-**最小必要配置**：
-```env
-OPENAI_API_KEY=sk-your-openai-api-key-here
-```
+你**必须修改**的项：
 
-### 3. 启动服务
-```bash
-docker compose up --build
-```
+| 变量 | 说明 | 怎么填 |
+|------|------|--------|
+| `SECRET_KEY` | JWT 加密密钥，保护用户登录安全 | 在终端运行 `openssl rand -hex 32` 生成一串随机字符串，粘贴进去 |
+| `ADMIN_PASSWORD` | 管理员密码 | 换一个你自己的强密码 |
 
-### 4. 访问应用
-- **前端界面**: http://localhost:18080
-- **默认管理员账号**:
-  - 邮箱: `admin@example.com`
-  - 密码: `admin123`
+可选修改：
 
-⚠️ **首次登录后立即修改密码！**
+| 变量 | 说明 |
+|------|------|
+| `OPENAI_API_KEY` | 你的 OpenAI API Key。填了才有 AI 问答功能；留空网站也能跑，但 AI 相关功能不可用 |
+| `ADMIN_EMAIL` | 管理员邮箱，默认 `admin@example.com` |
 
-## 详细部署步骤
+其他变量保持默认即可，无需修改。
 
-### Step 1: 环境准备
+编辑完成后：按 `Ctrl + O` → 回车（保存） → `Ctrl + X`（退出编辑器）。
 
-#### 安装 Docker (Ubuntu)
-```bash
-# 更新包索引
-sudo apt-get update
+### 5.3 一键启动
 
-# 安装依赖
-sudo apt-get install -y ca-certificates curl gnupg lsb-release
-
-# 添加 Docker 官方 GPG key
-sudo mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
-# 设置仓库
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# 安装 Docker Engine
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# 验证安装
-docker --version
-docker compose version
-```
-
-#### 配置 Docker 权限（可选）
-```bash
-# 添加当前用户到 docker 组
-sudo usermod -aG docker $USER
-
-# 重新登录或执行
-newgrp docker
-```
-
-### Step 2: 获取 OpenAI API Key
-
-1. 访问 https://platform.openai.com/api-keys
-2. 登录或注册账号
-3. 创建新的 API key
-4. 保存 key（格式：`sk-...`）
-
-**成本预估**（使用 gpt-4o-mini）：
-- 每次查询：约 $0.0001-0.0003
-- 1000次查询：约 $0.10-0.30
-- 月活100用户，平均每天10次查询：约 $3-9/月
-
-### Step 3: 配置应用
-
-#### 创建 .env 文件
-```bash
-cp .env.example .env
-```
-
-#### 编辑 .env 配置
-```env
-# ========== OpenAI 配置 ==========
-# 必需：用于AI问答和语义搜索
-OPENAI_API_KEY=sk-your-api-key-here
-
-# 可选：LLM模型选择（默认 gpt-4o-mini）
-# 选项: gpt-4o-mini（推荐，性价比高）, gpt-4o（质量最高）, gpt-3.5-turbo（最便宜但已过时）
-OPENAI_MODEL=gpt-4o-mini
-
-# ========== 安全配置 ==========
-# 必须修改：JWT签名密钥（生成随机字符串）
-SECRET_KEY=$(openssl rand -hex 32)
-
-# 必须修改：管理员账号
-ADMIN_EMAIL=your-admin@example.com
-ADMIN_PASSWORD=your-secure-password-here
-
-# ========== 数据库配置 ==========
-# 使用默认值即可（Docker内部网络）
-DATABASE_URL=postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive
-
-# ========== 对象存储配置 ==========
-# 使用默认值即可（Docker内部MinIO）
-MINIO_ENDPOINT=minio:9000
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=minioadmin
-MINIO_SECURE=false
-MINIO_BUCKET=documents
-
-# ========== 应用配置 ==========
-# 限流配置（每分钟请求次数）
-RATE_LIMIT_PER_MINUTE=60
-
-# CORS配置（允许的前端域名，逗号分隔）
-CORS_ORIGINS=http://localhost:18080,http://localhost:3000
-
-# ========== 端口配置（可选） ==========
-# 前端端口（默认18080）
-FRONTEND_HOST_PORT=18080
-
-# API端口（默认18000）
-API_HOST_PORT=18000
-
-# 数据库端口（默认15433）
-POSTGRES_HOST_PORT=15433
-
-# MinIO API端口（默认19002）
-MINIO_API_PORT=19002
-
-# MinIO控制台端口（默认19003）
-MINIO_CONSOLE_PORT=19003
-```
-
-### Step 4: 启动服务
-
-#### 开发环境启动（前台运行，可查看日志）
-```bash
-docker compose up --build
-```
-
-#### 生产环境启动（后台运行）
 ```bash
 docker compose up -d --build
 ```
 
-#### 查看日志
-```bash
-# 查看所有服务日志
-docker compose logs -f
+> **这条命令做了什么？**
+> - `docker compose up`：按照 `docker-compose.yml` 的描述，一次性启动所有容器。
+> - `--build`：首次运行时构建前端和后端的镜像（把代码打包成可运行的"快照"）。
+> - `-d`：后台运行（detach），不占用你的终端。
+>
+> ⏳ 首次启动需要下载数据库镜像并编译代码，**大约需要 3~10 分钟**，取决于服务器带宽和性能。可以泡杯茶等一等。
 
-# 查看特定服务日志
-docker compose logs -f api
-docker compose logs -f frontend
-docker compose logs -f db
-```
+### 5.4 查看运行状态
 
-#### 停止服务
-```bash
-# 停止但保留容器
-docker compose stop
-
-# 停止并删除容器（保留数据卷）
-docker compose down
-
-# 停止并删除所有（包括数据）
-docker compose down -v
-```
-
-### Step 5: 验证部署
-
-#### 健康检查
-```bash
-# 检查API健康状态
-curl http://localhost:18000/api/health
-
-# 预期输出: {"ok":true}
-```
-
-#### 服务状态
 ```bash
 docker compose ps
 ```
 
-预期输出所有服务状态为 `running` 和 `healthy`。
+如果看到四个服务（`db`、`minio`、`api`、`frontend`）的状态都是 `Up` 或 `running (healthy)`，**部署成功了！** 🎉
 
-#### 功能测试
-1. 访问 http://localhost:18080
-2. 使用管理员账号登录
-3. 测试上传档案
-4. 测试AI问答功能
-5. 测试题库功能
+### 5.5 访问你的网站
 
-## 环境变量配置
+打开你电脑上的浏览器，在地址栏输入：
 
-### 核心配置项
-
-| 变量名 | 必需 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `OPENAI_API_KEY` | 是* | - | OpenAI API密钥，用于AI功能 |
-| `OPENAI_MODEL` | 否 | `gpt-4o-mini` | LLM模型选择 |
-| `SECRET_KEY` | 是 | `change-me` | JWT签名密钥（生产环境必须修改） |
-| `ADMIN_EMAIL` | 否 | `admin@example.com` | 默认管理员邮箱 |
-| `ADMIN_PASSWORD` | 否 | `admin123` | 默认管理员密码 |
-
-\* 注：`OPENAI_API_KEY` 技术上可选，但未配置时仅有基础功能（无AI问答，使用哈希向量检索）
-
-### 模型选择对比
-
-| 模型 | 发布时间 | 输入价格 | 输出价格 | 特点 | 推荐场景 |
-|------|----------|----------|----------|------|----------|
-| **gpt-4o-mini** | 2024.07 | $0.15/1M tokens | $0.60/1M tokens | **推荐**：性价比最高，质量好 | 生产环境首选 |
-| gpt-4o | 2024.05 | $5.00/1M tokens | $15.00/1M tokens | 质量最高，速度快 | 高质量要求场景 |
-| gpt-3.5-turbo | 2023.03 | $0.50/1M tokens | $1.50/1M tokens | 已过时，不推荐 | 不推荐 |
-
-### 端口配置
-
-所有端口均可通过环境变量自定义，避免冲突：
-
-```env
-# 前端（Nginx）
-FRONTEND_HOST_PORT=18080
-
-# 后端API（FastAPI）
-API_HOST_PORT=18000
-
-# PostgreSQL
-POSTGRES_HOST_PORT=15433
-
-# MinIO API
-MINIO_API_PORT=19002
-
-# MinIO Console
-MINIO_CONSOLE_PORT=19003
+```
+http://你的服务器公网IP:18080
 ```
 
-## 生产环境部署
+> 例如：`http://123.45.67.89:18080`
 
-### 安全加固
+你应该能看到 SDU Archive 的页面了！
 
-#### 1. 修改所有默认凭证
-```env
-# 生成安全的随机密钥
-SECRET_KEY=$(openssl rand -hex 32)
+**默认管理员账号**：
+- 邮箱：你在 `.env` 中设置的 `ADMIN_EMAIL`（默认 `admin@example.com`）
+- 密码：你在 `.env` 中设置的 `ADMIN_PASSWORD`
 
-# 修改管理员账号
-ADMIN_EMAIL=real-admin@yourdomain.com
-ADMIN_PASSWORD=$(openssl rand -base64 32)
-
-# MinIO凭证（如果需要外部访问）
-MINIO_ROOT_USER=secure-user
-MINIO_ROOT_PASSWORD=secure-password-$(openssl rand -hex 16)
-```
-
-#### 2. 配置 HTTPS
-
-使用 Nginx 反向代理 + Let's Encrypt：
-
-```nginx
-# /etc/nginx/sites-available/sdu-archive
-server {
-    listen 80;
-    server_name archive.yourdomain.com;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name archive.yourdomain.com;
-
-    ssl_certificate /etc/letsencrypt/live/archive.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/archive.yourdomain.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:18080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-获取SSL证书：
-```bash
-sudo certbot --nginx -d archive.yourdomain.com
-```
-
-#### 3. 配置防火墙
-```bash
-# 仅允许 80/443 端口外部访问
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw enable
-
-# 其他端口仅本地访问（已由 docker-compose 默认绑定到 127.0.0.1）
-```
-
-#### 4. 限制CORS来源
-```env
-# 仅允许你的域名
-CORS_ORIGINS=https://archive.yourdomain.com
-```
-
-### 监控与日志
-
-#### 配置日志轮转
-```bash
-# 创建 Docker 日志配置
-sudo nano /etc/docker/daemon.json
-```
-
-```json
-{
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-```
-
-```bash
-sudo systemctl restart docker
-```
-
-#### 使用 docker-compose 日志限制
-```yaml
-# docker-compose.yml
-services:
-  api:
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-```
-
-### 自动重启
-
-系统级服务（systemd）：
-
-```bash
-# 创建服务文件
-sudo nano /etc/systemd/system/sdu-archive.service
-```
-
-```ini
-[Unit]
-Description=SDU Archive
-Requires=docker.service
-After=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/path/to/SDU_Archive
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# 启用服务
-sudo systemctl enable sdu-archive.service
-sudo systemctl start sdu-archive.service
-```
-
-## 故障排查
-
-### 常见问题
-
-#### 1. 容器无法启动
-```bash
-# 查看详细日志
-docker compose logs -f
-
-# 检查端口占用
-sudo lsof -i :18080
-sudo lsof -i :18000
-```
-
-#### 2. 数据库连接失败
-```bash
-# 检查数据库健康状态
-docker compose exec db pg_isready -U sdu -d sdu_archive
-
-# 查看数据库日志
-docker compose logs db
-
-# 手动连接测试
-docker compose exec db psql -U sdu -d sdu_archive
-```
-
-#### 3. MinIO 连接失败
-```bash
-# 检查 MinIO 日志
-docker compose logs minio
-
-# 验证 MinIO 可访问性
-curl http://localhost:19002/minio/health/live
-```
-
-#### 4. OpenAI API 错误
-```bash
-# 检查 API key 是否正确
-docker compose exec api python -c "from app.config import get_settings; print(get_settings().openai_api_key)"
-
-# 测试 API key
-curl https://api.openai.com/v1/models \
-  -H "Authorization: Bearer $OPENAI_API_KEY"
-```
-
-#### 5. 前端无法访问后端
-```bash
-# 检查 Nginx 配置
-docker compose exec frontend cat /etc/nginx/nginx.conf
-
-# 查看前端日志
-docker compose logs frontend
-
-# 测试API直接访问
-curl http://localhost:18000/api/health
-```
-
-### 性能问题
-
-#### 慢查询优化
-```bash
-# 进入数据库
-docker compose exec db psql -U sdu -d sdu_archive
-
-# 查看慢查询
-SELECT query, calls, total_time, mean_time
-FROM pg_stat_statements
-ORDER BY mean_time DESC
-LIMIT 10;
-
-# 检查索引使用
-SELECT schemaname, tablename, indexname, idx_scan
-FROM pg_stat_user_indexes
-ORDER BY idx_scan;
-```
-
-#### 向量检索优化
-```sql
--- 添加向量索引（如果未创建）
-CREATE INDEX IF NOT EXISTS chunks_embedding_idx
-ON chunks USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
-
--- 分析表统计
-ANALYZE chunks;
-```
-
-## 性能优化
-
-### 数据库优化
-
-#### 调整 PostgreSQL 配置
-```bash
-docker compose exec db bash -c "cat >> /var/lib/postgresql/data/postgresql.conf <<EOF
-# 内存设置（4GB RAM系统）
-shared_buffers = 1GB
-effective_cache_size = 3GB
-maintenance_work_mem = 256MB
-work_mem = 16MB
-
-# 连接设置
-max_connections = 100
-
-# WAL设置
-wal_buffers = 16MB
-checkpoint_completion_target = 0.9
-EOF"
-
-# 重启数据库
-docker compose restart db
-```
-
-### 应用缓存
-
-考虑添加 Redis 用于：
-- API响应缓存
-- 会话存储
-- 速率限制
-
-### CDN配置
-
-对于静态资源（前端），使用 CDN 加速：
-- 图片
-- CSS/JS文件
-- 字体文件
-
-## 备份与恢复
-
-### 数据库备份
-
-#### 自动备份脚本
-```bash
-#!/bin/bash
-# backup-db.sh
-
-BACKUP_DIR="/backup/sdu-archive"
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="$BACKUP_DIR/sdu_archive_$DATE.sql.gz"
-
-mkdir -p $BACKUP_DIR
-
-docker compose exec -T db pg_dump -U sdu sdu_archive | gzip > $BACKUP_FILE
-
-# 保留最近7天的备份
-find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
-
-echo "Backup completed: $BACKUP_FILE"
-```
-
-设置定时任务：
-```bash
-# 每天凌晨2点备份
-crontab -e
-0 2 * * * /path/to/backup-db.sh
-```
-
-#### 恢复数据库
-```bash
-# 停止服务
-docker compose stop api
-
-# 恢复数据
-gunzip < backup.sql.gz | docker compose exec -T db psql -U sdu -d sdu_archive
-
-# 启动服务
-docker compose start api
-```
-
-### MinIO 数据备份
-
-```bash
-# 备份 MinIO 数据
-docker compose exec minio mc mirror /data /backup
-
-# 或使用 Docker 卷备份
-docker run --rm -v sdu_archive_minio_data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/minio-backup.tar.gz /data
-```
-
-### 完整系统备份
-```bash
-#!/bin/bash
-# full-backup.sh
-
-BACKUP_DIR="/backup/sdu-archive-full"
-DATE=$(date +%Y%m%d_%H%M%S)
-
-mkdir -p $BACKUP_DIR/$DATE
-
-# 备份数据库
-docker compose exec -T db pg_dump -U sdu sdu_archive | gzip > $BACKUP_DIR/$DATE/database.sql.gz
-
-# 备份 MinIO 数据
-docker run --rm -v sdu_archive_minio_data:/data -v $BACKUP_DIR/$DATE:/backup \
-  alpine tar czf /backup/minio.tar.gz /data
-
-# 备份配置文件
-cp .env $BACKUP_DIR/$DATE/
-cp docker-compose.yml $BACKUP_DIR/$DATE/
-
-echo "Full backup completed: $BACKUP_DIR/$DATE"
-```
-
-## 升级指南
-
-### 升级应用
-```bash
-# 1. 备份数据
-./backup-db.sh
-
-# 2. 拉取最新代码
-git pull origin main
-
-# 3. 重新构建
-docker compose build
-
-# 4. 重启服务
-docker compose up -d
-
-# 5. 验证
-docker compose ps
-curl http://localhost:18000/api/health
-```
-
-### 升级 Docker 镜像
-```bash
-# 拉取最新镜像
-docker compose pull
-
-# 重启服务
-docker compose up -d
-```
-
-## 支持与反馈
-
-- **问题反馈**: https://github.com/shadow-opt/SDU_Archive/issues
-- **文档**: https://github.com/shadow-opt/SDU_Archive
-- **更新日志**: 查看 Git commits
+> ⚠️ 如果打不开，请检查：
+> 1. 服务器防火墙（UFW）是否放行了 18080 端口？
+> 2. 云平台安全组是否也放行了 18080？
+> 3. 运行 `docker compose logs` 查看是否有报错信息。
 
 ---
 
-**最后更新**: 2026-02-20
-**维护者**: SDU Archive Team
+## 六、域名与 HTTPS（可选）
+
+用 `IP:端口` 访问虽然能用，但不正式也不安全（HTTP 明文传输）。如果你想让网站变成 `https://yoursite.com`，请继续。
+
+### 6.1 关于备案的重要说明
+
+| 场景 | 是否需要备案 |
+|------|:----------:|
+| 国内服务器 + 绑定域名 | ✅ **需要** |
+| 国内服务器 + 只用 IP:端口访问 | ❌ 不需要 |
+| 海外服务器 + 绑定域名 | ❌ **不需要** |
+
+**如果你用的是阿里云等国内服务器，并且想绑定域名**：
+- 你需要在阿里云控制台完成 [ICP 备案](https://beian.aliyun.com/)。
+- 流程：填写网站信息 → 人脸核验 → 提交管局审核 → 等待 5~15 个工作日。
+- 备案期间网站可以正常用 IP:端口访问，不受影响。
+- 备案通过后才能将域名解析到国内服务器。
+
+**如果你用的是海外服务器**：跳过备案，直接往下走。
+
+### 6.2 购买域名
+
+推荐的域名注册商：
+- 国内：[阿里云 万网](https://wanwang.aliyun.com/)、[腾讯云 DNSPod](https://dnspod.cloud.tencent.com/)
+- 海外（不需要实名）：[Namecheap](https://www.namecheap.com/)、[Cloudflare Registrar](https://www.cloudflare.com/products/registrar/)
+
+挑一个你喜欢的域名，完成购买。
+
+### 6.3 解析域名到服务器
+
+在域名注册商的 DNS 管理页面，添加一条 **A 记录**：
+
+| 记录类型 | 主机记录 | 记录值 | TTL |
+|---------|---------|--------|-----|
+| A | `@` | 你的服务器公网 IP | 600 |
+| A | `www` | 你的服务器公网 IP | 600 |
+
+> `@` 代表根域名（`yoursite.com`），`www` 代表 `www.yoursite.com`。
+
+设置好后等几分钟，在终端验证：
+
+```bash
+ping yoursite.com
+# 如果解析成功，会显示你服务器的 IP
+```
+
+### 6.4 配置 HTTPS（使用 Caddy 反向代理）
+
+为了让网站可以通过 `https://yoursite.com`（不带端口号）访问，你需要一个**反向代理**把 80/443 端口的请求转发到项目的 18080 端口，并自动申请 SSL 证书。
+
+这里推荐 **Caddy**——它是对新手最友好的方案，**自动申请和续期 HTTPS 证书**，几行配置就搞定。
+
+#### 安装 Caddy
+
+```bash
+apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.gpg' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null || true
+curl -1sLf 'https://dl.cloudflare.com/caddy/stable/deb/debian/setup.deb.sh' | bash 2>/dev/null || true
+# 使用官方仓库安装
+sudo apt install -y caddy 2>/dev/null || {
+  # 备选：直接用官方脚本
+  curl -fsSL https://caddyserver.com/api/download?os=linux\&arch=amd64 -o /usr/bin/caddy
+  chmod +x /usr/bin/caddy
+}
+```
+
+> 💡 如果上面的命令报错，可以访问 [Caddy 官方安装文档](https://caddyserver.com/docs/install#debian-ubuntu-raspbian) 获取最新安装方式。
+
+#### 编写配置文件
+
+```bash
+nano /etc/caddy/Caddyfile
+```
+
+将内容替换为（把 `yoursite.com` 换成你的真实域名）：
+
+```
+yoursite.com {
+    reverse_proxy localhost:18080
+}
+```
+
+是的，**就这两行**。Caddy 会自动：
+1. 监听 80 和 443 端口。
+2. 向 Let's Encrypt 申请免费 SSL 证书。
+3. 把所有 HTTP 请求自动跳转到 HTTPS。
+4. 把请求转发给你运行在 18080 端口的前端。
+
+保存退出后，重启 Caddy：
+
+```bash
+sudo systemctl restart caddy
+```
+
+#### 验证
+
+等待约 30 秒，打开浏览器访问：
+
+```
+https://yoursite.com
+```
+
+看到地址栏的 🔒 和你的网站页面，就大功告成了！
+
+---
+
+## 常见问题（FAQ）
+
+### Q：`docker compose up` 时拉取镜像特别慢 / 超时怎么办？
+**A**：国内服务器访问 Docker Hub 较慢。搜索「**阿里云 Docker 镜像加速器**」配置加速。具体步骤：阿里云控制台 → 搜索「容器镜像服务」→ 镜像加速器 → 按文档配置 `/etc/docker/daemon.json`。
+
+### Q：浏览器打不开网站？
+**A**：按以下顺序排查：
+1. `docker compose ps` 看四个容器是否都在运行。
+2. `docker compose logs api` 看后端是否报错。
+3. `ufw status` 确认端口已放行。
+4. 去云平台控制台确认安全组也放行了对应端口。
+
+### Q：`docker compose up` 报错 `SECRET_KEY` 相关错误？
+**A**：你忘了配置 `.env` 文件。回到[第 5.2 节](#52-配置环境变量)操作。
+
+### Q：如何更新网站代码？
+**A**：
+```bash
+cd SDU_Archive
+git pull
+docker compose up -d --build
+```
+
+### Q：如何查看服务日志？
+**A**：
+```bash
+# 查看所有服务的日志
+docker compose logs
+
+# 只看后端日志（最后 50 行）
+docker compose logs --tail 50 api
+
+# 实时跟踪日志（Ctrl+C 退出）
+docker compose logs -f api
+```
+
+### Q：我用了海外服务器，国内用户访问很慢怎么办？
+**A**：选服务器时优先选 **日本东京、新加坡、中国香港** 节点，延迟通常在 50~100ms，日常使用体感差别不大。
+
+---
+
+🎉 **恭喜你完成了从零到一的网站搭建！** 这是一项非常实用的技能，不管以后做什么项目，这套流程都大同小异。享受你的全栈开发者之旅吧！

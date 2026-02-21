@@ -70,6 +70,13 @@ class DocumentOut(BaseModel):
     created_at: datetime
 
 
+class DocumentListResponse(BaseModel):
+    items: List[DocumentOut]
+    total: int
+    skip: int
+    limit: int
+
+
 class ChunkUpdate(BaseModel):
     content: str
 
@@ -87,6 +94,13 @@ class ChunkOut(BaseModel):
     updated_at: datetime
 
 
+class ChunkListResponse(BaseModel):
+    items: List[ChunkOut]
+    total: int
+    skip: int
+    limit: int
+
+
 class RagQuery(BaseModel):
     query: str
     top_k: int = Field(default=4, le=10)
@@ -95,11 +109,13 @@ class RagQuery(BaseModel):
 class RagCitation(BaseModel):
     source: str
     snippet: str
+    document_title: Optional[str] = None
 
 
 class RagResponse(BaseModel):
     answer: str
     citations: List[RagCitation]
+    degraded: bool = False
 
 
 class QuestionCreate(BaseModel):
@@ -126,6 +142,7 @@ class QuestionOut(BaseModel):
     prompt: str
     options: List[str]
     points: int
+    answered: bool = False
 
 
 class QuestionAdminOut(BaseModel):

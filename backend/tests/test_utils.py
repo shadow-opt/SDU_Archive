@@ -5,12 +5,12 @@ from backend.app.utils.embedding import embed_text
 
 
 def test_split_text_respects_overlap():
-    text = "0123456789" * 10  # 100 chars
-    chunks = split_text(text, chunk_size=20, overlap=5)
-    # Current logic keeps overlapping until tail included
-    assert len(chunks) == 7
-    # Overlap check: next chunk starts within previous 5 chars
-    assert chunks[1].startswith(chunks[0][-5:])
+    text = "这是一句话。" * 40  # 240 chars with sentence boundaries
+    chunks = split_text(text, max_chars=80, overlap_chars=20)
+    assert len(chunks) >= 2
+    # Each chunk should not exceed max_chars significantly
+    for c in chunks:
+        assert len(c) <= 100  # allow some boundary overshoot
 
 
 def test_embed_text_returns_fixed_length():

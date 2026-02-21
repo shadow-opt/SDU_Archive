@@ -7,15 +7,30 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from .deps import get_current_user, get_db, rate_limiter, require_admin
-from .models import AnswerRecord, QuizQuestion, QuizSubmission, UserScore
+from .models import AnswerRecord, QuizQuestion, User, UserScore
 from .schemas import QuestionAdminOut, QuestionCreate, QuestionOut, QuestionSubmit, QuestionUpdate, SubmissionResult
 
 router = APIRouter(prefix="/api/quiz", tags=["quiz"], dependencies=[Depends(rate_limiter)])
 
 
 @router.get("/questions", response_model=list[QuestionOut])
-def list_questions(db: Session = Depends(get_db), _: str = Depends(get_current_user)):
-    return db.query(QuizQuestion).order_by(QuizQuestion.created_at.desc()).all()
+def list_questions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    questions = db.query(QuizQuestion).order_by(QuizQuestion.created_at.desc()).all()
+    answered_ids = set(
+        row[0] for row in db.query(AnswerRecord.question_id)
+        .filter(AnswerRecord.user_id == current_user.id)
+        .all()
+    )
+    return [
+        QuestionOut(
+            id=q.id,
+            prompt=q.prompt,
+            options=q.options,
+            points=q.points,
+            answered=q.id in answered_ids,
+        )
+        for q in questions
+    ]
 
 
 @router.post("/questions", response_model=QuestionOut)
@@ -135,13 +150,6 @@ def submit_answer(
         raise HTTPException(status_code=400, detail="Already answered")
     is_correct = payload.answer_index == question.correct_index
     awarded = question.points if is_correct else 0
-    submission = QuizSubmission(
-        user_id=current_user.id,
-        question_id=question_id,
-        is_correct=is_correct,
-        points_awarded=awarded,
-    )
-    db.add(submission)
     db.add(
         AnswerRecord(
             user_id=current_user.id,

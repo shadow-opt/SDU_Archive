@@ -8,6 +8,7 @@ type Question = {
   prompt: string;
   options: string[];
   points: number;
+  answered: boolean;
 };
 
 export default function Quiz() {
@@ -83,12 +84,32 @@ export default function Quiz() {
     );
   }
 
+  const unansweredQuestions = questions.filter((q) => !q.answered);
+  const answeredCount = questions.filter((q) => q.answered).length;
+
   const selectedQuestion = questions.find((q) => q.id === selectedQuestionId) ?? null;
+
+  if (questions.length > 0 && unansweredQuestions.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
+        <h2 className="text-2xl font-serif font-bold mb-3">🎉 全部答完！</h2>
+        <p className="text-ink-light mb-4">你已完成全部 {questions.length} 道题目。</p>
+        {score !== null && (
+          <p className="text-lg font-medium text-sdu-red">累计积分：{score}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8">
       <h2 className="text-2xl font-serif font-bold mb-2">互动题库</h2>
-      <p className="text-ink-light mb-6">登录用户可参与答题并累计积分。</p>
+      <p className="text-ink-light mb-6">
+        登录用户可参与答题并累计积分。
+        {questions.length > 0 && (
+          <span className="ml-2 text-sm">（已答 {answeredCount}/{questions.length}）</span>
+        )}
+      </p>
 
       <form onSubmit={submitAnswer} className="space-y-6">
         <div>
@@ -103,8 +124,8 @@ export default function Quiz() {
           >
             <option value="">请选择题目</option>
             {questions.map((q) => (
-              <option key={q.id} value={q.id}>
-                {q.prompt.slice(0, 60)}{q.prompt.length > 60 ? '...' : ''}
+              <option key={q.id} value={q.id} disabled={q.answered}>
+                {q.answered ? '✓ ' : ''}{q.prompt.slice(0, 60)}{q.prompt.length > 60 ? '...' : ''}
               </option>
             ))}
           </select>

@@ -1,5 +1,11 @@
-import { useEffect, useState } from 'react';
-import { apiBase } from '../services/api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiBase, getAuthToken, clearAuthToken } from '../services/api';
+
+interface Citation {
+  source: string;
+  snippet: string;
+  document_title?: string;
+}
 
 export default function Home() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -8,15 +14,14 @@ export default function Home() {
   const [token, setToken] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
-  const [citations, setCitations] = useState<{ source: string; snippet: string }[]>([]);
+  const [citations, setCitations] = useState<Citation[]>([]);
   const [status, setStatus] = useState('');
   const [isAnswerExpanded, setIsAnswerExpanded] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem('token');
-    if (saved) {
-      setToken(saved);
-    }
+    setToken(getAuthToken());
   }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -53,57 +58,101 @@ export default function Home() {
       localStorage.setItem('token', data.access_token);
       setToken(data.access_token);
       setStatus('登录成功，现在可以检索了');
+      setEmail('');
+      setPassword('');
     } catch (err) {
       setStatus(err instanceof Error ? err.message : '认证失败');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    clearAuthToken();
     setToken(null);
     setAnswer('');
     setCitations([]);
     setStatus('已退出登录');
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // ─── SSE streaming search ───────────────────────────────────────────
+  const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-    if (!token) {
-      setStatus('请先登录后再进行校史检索');
+    if (!query.trim() || !token) {
+      if (!token) setStatus('请先登录后再进行校史检索');
       return;
     }
-    
+
+    // Abort any in-flight request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setStatus('检索中...');
     setAnswer('');
     setCitations([]);
+    setStreaming(true);
+    setIsAnswerExpanded(false);
 
     try {
-      const res = await fetch(`${apiBase}/api/rag/query`, {
+      const res = await fetch(`${apiBase}/api/rag/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ query }),
+        signal: controller.signal,
       });
-      
+
       if (res.status === 401) {
-        localStorage.removeItem('token');
+        clearAuthToken();
         setToken(null);
         throw new Error('登录已过期，请重新登录');
       }
       if (!res.ok) throw new Error('查询失败');
-      
-      const data = await res.json();
-      setAnswer(data.answer);
-      setCitations(data.citations || []);
-      setIsAnswerExpanded(false);
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('浏览器不支持流式读取');
+
+      const decoder = new TextDecoder();
+      let buf = '';
+
       setStatus('');
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const payload = JSON.parse(line.slice(6));
+            if (payload.citations) {
+              setCitations(payload.citations);
+            }
+            if (payload.text) {
+              setAnswer((prev) => prev + payload.text);
+            }
+            if (payload.error) {
+              setStatus(payload.error);
+            }
+          } catch {
+            // ignore malformed SSE lines
+          }
+        }
+      }
     } catch (err) {
-      setStatus('查询失败，请稍后重试');
+      if ((err as Error).name !== 'AbortError') {
+        setStatus(err instanceof Error ? err.message : '查询失败，请稍后重试');
+      }
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
     }
-  };
+  }, [query, token]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-3xl mx-auto text-center">
@@ -178,10 +227,10 @@ export default function Home() {
         />
         <button
           type="submit"
-          disabled={!token || !query.trim() || status === '检索中...'}
+          disabled={!token || !query.trim() || streaming}
           className="absolute right-2 top-2 bottom-2 px-6 bg-sdu-red text-white rounded-full font-medium hover:bg-sdu-red-hover disabled:opacity-50 transition-colors"
         >
-          {status === '检索中...' ? '检索中' : '搜索'}
+          {streaming ? '生成中…' : '搜索'}
         </button>
       </form>
 
@@ -189,12 +238,13 @@ export default function Home() {
         <div className="text-sdu-red mb-8">{status}</div>
       )}
 
-      {answer && (
+      {(answer || streaming) && (
         <div className="w-full text-left bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-ink-dark/5 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <h3 className="text-xl font-serif font-bold mb-4 text-ink-dark">AI 回答</h3>
-          <div className="prose prose-stone max-w-none mb-8 text-ink-dark/80 leading-relaxed">
+          <div className="prose prose-stone max-w-none mb-8 text-ink-dark/80 leading-relaxed whitespace-pre-wrap">
             <div className={`${!isAnswerExpanded && answer.length > 500 ? 'line-clamp-6 md:line-clamp-none' : ''}`}>
               {answer}
+              {streaming && <span className="inline-block w-2 h-4 bg-sdu-red/60 animate-pulse ml-0.5 align-text-bottom" />}
             </div>
             {!isAnswerExpanded && answer.length > 500 && (
               <button
@@ -222,18 +272,9 @@ export default function Home() {
               <ul className="space-y-4">
                 {citations.map((cit, idx) => (
                   <li key={idx} className="text-sm bg-paper-bg p-4 rounded-lg border border-ink-dark/5">
-                    {cit.source.startsWith('http') ? (
-                      <a
-                        href={cit.source}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-sdu-red hover:underline block mb-1"
-                      >
-                        {cit.source}
-                      </a>
-                    ) : (
-                      <span className="font-medium text-sdu-red block mb-1">{cit.source}</span>
-                    )}
+                    <span className="font-medium text-sdu-red block mb-1">
+                      [{idx + 1}] {cit.document_title || cit.source}
+                    </span>
                     <span className="text-ink-light line-clamp-3">{cit.snippet}</span>
                   </li>
                 ))}

@@ -93,6 +93,10 @@ def run_compat_migrations():
         """,
         "CREATE INDEX IF NOT EXISTS idx_answer_records_user_id ON answer_records(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_answer_records_question_id ON answer_records(question_id)",
+        # HNSW index for fast vector similarity search
+        "CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops)",
+        # Drop deprecated quiz_submissions table (merged into answer_records)
+        "DROP TABLE IF EXISTS quiz_submissions",
     ]
 
     with engine.begin() as conn:

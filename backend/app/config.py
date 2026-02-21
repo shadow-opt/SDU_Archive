@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     admin_email: str | None = None
     admin_password: str | None = None
-    cors_origins: str = "http://localhost:18080,http://localhost:3000,http://localhost:5173"
+    cors_origins: str = "http://localhost:18080,http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

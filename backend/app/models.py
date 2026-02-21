@@ -20,7 +20,6 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     documents = relationship("Document", back_populates="uploader")
-    submissions = relationship("QuizSubmission", back_populates="user")
     answer_records = relationship("AnswerRecord", back_populates="user")
     score = relationship("UserScore", uselist=False, back_populates="user")
 
@@ -70,23 +69,7 @@ class QuizQuestion(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    submissions = relationship("QuizSubmission", back_populates="question")
     answer_records = relationship("AnswerRecord", back_populates="question")
-
-
-class QuizSubmission(Base):
-    __tablename__ = "quiz_submissions"
-    __table_args__ = (UniqueConstraint("user_id", "question_id", name="uq_user_question"),)
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"))
-    question_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("quiz_questions.id"))
-    is_correct: Mapped[bool] = mapped_column(Boolean, default=False)
-    points_awarded: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-
-    user = relationship("User", back_populates="submissions")
-    question = relationship("QuizQuestion", back_populates="submissions")
 
 
 class AnswerRecord(Base):

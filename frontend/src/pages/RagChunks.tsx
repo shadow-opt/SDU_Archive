@@ -17,6 +17,7 @@ type Chunk = {
 export default function RagChunks() {
   const pageSize = 20;
   const [chunks, setChunks] = useState<Chunk[]>([]);
+  const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<Chunk | null>(null);
   const [content, setContent] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -45,10 +46,11 @@ export default function RagChunks() {
         setStatus(await parseApiError(res, '加载切片失败'));
         return;
       }
-      const data = (await res.json()) as Chunk[];
-      setChunks((prev) => (append ? [...prev, ...data] : data));
+      const data = (await res.json()) as { items: Chunk[]; total: number };
+      setChunks((prev) => (append ? [...prev, ...data.items] : data.items));
+      setTotal(data.total);
       setSkip(nextSkip);
-      setHasMore(data.length === pageSize);
+      setHasMore(nextSkip + data.items.length < data.total);
     } catch {
       setStatus('加载切片失败，请稍后重试');
     } finally {
@@ -91,6 +93,7 @@ export default function RagChunks() {
 
   const deleteChunk = async () => {
     if (!selected) return;
+    if (!window.confirm('确定要删除该切片吗？此操作不可恢复。')) return;
     setStatus('删除中...');
 
     try {
@@ -135,7 +138,7 @@ export default function RagChunks() {
     <div className="bg-white rounded-2xl border border-ink-dark/10 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-serif font-bold">RAG 知识切片干预台</h2>
-        <button onClick={() => void loadChunks(0, appliedKeyword, false)} className="text-sm px-3 py-2 rounded-md border border-ink-dark/20 hover:border-[#9C0C13]">
+        <button onClick={() => void loadChunks(0, appliedKeyword, false)} className="text-sm px-3 py-2 rounded-md border border-ink-dark/20 hover:border-sdu-red">
           刷新
         </button>
       </div>
@@ -148,7 +151,7 @@ export default function RagChunks() {
           placeholder="按关键词检索切片内容或来源"
           className="flex-1 px-3 py-2 text-sm rounded-lg border border-ink-dark/20"
         />
-        <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]">
+        <button type="submit" className="px-4 py-2 text-sm rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">
           搜索
         </button>
       </form>
@@ -176,7 +179,7 @@ export default function RagChunks() {
                   <button
                     type="button"
                     onClick={() => openEditor(chunk)}
-                    className="px-3 py-1.5 rounded-md bg-[#9C0C13] text-white hover:bg-[#7d0a10]"
+                    className="px-3 py-1.5 rounded-md bg-sdu-red text-white hover:bg-sdu-red-hover"
                   >
                     编辑
                   </button>
@@ -193,12 +196,13 @@ export default function RagChunks() {
       </div>
 
       {chunks.length > 0 && (
-        <div className="pt-3 flex justify-center">
+        <div className="pt-3 flex items-center justify-between">
+          <span className="text-xs text-ink-light">共 {total} 条，已加载 {chunks.length} 条</span>
           <button
             type="button"
             onClick={() => void loadMore()}
             disabled={!hasMore || loading}
-            className="px-4 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-[#9C0C13] disabled:opacity-50"
+            className="px-4 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-sdu-red disabled:opacity-50"
           >
             {hasMore ? '加载更多' : '没有更多了'}
           </button>
@@ -228,7 +232,7 @@ export default function RagChunks() {
                 rows={14}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-ink-dark/20 focus:ring-2 focus:ring-[#9C0C13]/40 focus:outline-none"
+                className="w-full px-4 py-3 rounded-lg border border-ink-dark/20 focus:ring-2 focus:ring-sdu-red/40 focus:outline-none"
               />
               <div className="flex gap-3 justify-end">
                 <button
@@ -240,7 +244,7 @@ export default function RagChunks() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#9C0C13] text-white rounded-lg hover:bg-[#7d0a10] transition-colors"
+                  className="px-4 py-2 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors"
                 >
                   保存并重嵌入
                 </button>

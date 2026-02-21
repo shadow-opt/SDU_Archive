@@ -172,7 +172,7 @@ export default function AdminUsers() {
     <div className="bg-white rounded-2xl border border-ink-dark/10 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-serif font-bold">用户管理</h2>
-        <button type="button" onClick={() => void refresh()} className="px-3 py-2 rounded-md border border-ink-dark/20 hover:border-[#9C0C13] text-sm">
+        <button type="button" onClick={() => void refresh()} className="px-3 py-2 rounded-md border border-ink-dark/20 hover:border-sdu-red text-sm">
           刷新
         </button>
       </div>
@@ -195,7 +195,7 @@ export default function AdminUsers() {
           <option value="true">启用</option>
           <option value="false">停用</option>
         </select>
-        <button className="md:col-span-4 py-2 rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]">查询</button>
+        <button className="md:col-span-4 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">查询</button>
       </form>
 
       <div className="overflow-x-auto border border-ink-dark/10 rounded-lg">
@@ -221,7 +221,7 @@ export default function AdminUsers() {
                 </td>
                 <td className="px-3 py-2 text-ink-light">{new Date(u.created_at).toLocaleString()}</td>
                 <td className="px-3 py-2">
-                  <button type="button" onClick={() => openDrawer(u)} className="px-3 py-1.5 rounded-md bg-[#9C0C13] text-white hover:bg-[#7d0a10]">
+                  <button type="button" onClick={() => openDrawer(u)} className="px-3 py-1.5 rounded-md bg-sdu-red text-white hover:bg-sdu-red-hover">
                     管理
                   </button>
                 </td>
@@ -276,7 +276,7 @@ export default function AdminUsers() {
                     <option value="admin">admin</option>
                     <option value="user">user</option>
                   </select>
-                  <button type="button" onClick={() => void updateRole()} className="px-3 py-2 rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]">保存</button>
+                  <button type="button" onClick={() => void updateRole()} className="px-3 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">保存</button>
                 </div>
               </div>
 
@@ -287,7 +287,7 @@ export default function AdminUsers() {
                     <option value="true">启用</option>
                     <option value="false">停用</option>
                   </select>
-                  <button type="button" onClick={() => void updateStatus()} className="px-3 py-2 rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]">保存</button>
+                  <button type="button" onClick={() => void updateStatus()} className="px-3 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">保存</button>
                 </div>
               </div>
 
@@ -301,7 +301,7 @@ export default function AdminUsers() {
                     placeholder="新密码（至少 8 位）"
                     className="flex-1 px-3 py-2 rounded-lg border border-ink-dark/20"
                   />
-                  <button type="button" onClick={() => void resetPassword()} className="px-3 py-2 rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]">重置</button>
+                  <button type="button" onClick={() => void resetPassword()} className="px-3 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">重置</button>
                 </div>
               </div>
             </div>

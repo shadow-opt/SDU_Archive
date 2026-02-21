@@ -113,6 +113,7 @@ export default function QuizManager() {
   };
 
   const deleteQuestion = async (questionId: string) => {
+    if (!window.confirm('确定要删除该题目吗？此操作不可恢复。')) return;
     setStatus('删除中...');
     try {
       const res = await fetch(`${apiBase}/api/quiz/questions/${questionId}`, {
@@ -216,18 +217,18 @@ export default function QuizManager() {
           <button
             type="button"
             onClick={downloadCsvTemplate}
-            className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-[#9C0C13]"
+            className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-sdu-red"
           >
             下载模板
           </button>
-          <label className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-[#9C0C13] cursor-pointer">
+          <label className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-sdu-red cursor-pointer">
             {importing ? '导入中...' : '批量导入 CSV'}
             <input type="file" accept=".csv" className="hidden" onChange={(e) => void onImportCsv(e.target.files?.[0] ?? null)} disabled={importing} />
           </label>
           <button
             type="button"
             onClick={openCreateDrawer}
-            className="px-4 py-2 rounded-lg bg-[#9C0C13] text-white hover:bg-[#7d0a10]"
+            className="px-4 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover"
           >
             + 新增题目
           </button>
@@ -269,7 +270,7 @@ export default function QuizManager() {
                     <button
                       type="button"
                       onClick={() => openEditDrawer(q)}
-                      className="px-3 py-1.5 rounded-md bg-[#9C0C13] text-white hover:bg-[#7d0a10]"
+                      className="px-3 py-1.5 rounded-md bg-sdu-red text-white hover:bg-sdu-red-hover"
                     >
                       编辑
                     </button>
@@ -320,21 +321,11 @@ export default function QuizManager() {
                   value={form.prompt}
                   onChange={(e) => setForm((prev) => ({ ...prev, prompt: e.target.value }))}
                   required
-                  className="w-full px-4 py-3 rounded-lg border border-ink-dark/20 focus:ring-2 focus:ring-[#9C0C13]/40 focus:outline-none"
+                  className="w-full px-4 py-3 rounded-lg border border-ink-dark/20 focus:ring-2 focus:ring-sdu-red/40 focus:outline-none"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">题目类型</label>
-                  <select
-                    value={form.question_type}
-                    onChange={(e) => setForm((prev) => ({ ...prev, question_type: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
-                  >
-                    <option value="single_choice">single_choice</option>
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">分值</label>
                   <input
@@ -345,12 +336,13 @@ export default function QuizManager() {
                     className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
                   />
                 </div>
+                <div />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-medium">选项动态管理</label>
-                  <button type="button" onClick={addOption} className="text-sm text-[#9C0C13] hover:underline">添加选项</button>
+                  <button type="button" onClick={addOption} className="text-sm text-sdu-red hover:underline">添加选项</button>
                 </div>
                 <div className="space-y-2">
                   {form.options.map((opt, idx) => (
@@ -389,7 +381,7 @@ export default function QuizManager() {
                 />
               </div>
 
-              <button className="w-full py-3 bg-[#9C0C13] text-white rounded-lg hover:bg-[#7d0a10] transition-colors">
+              <button className="w-full py-3 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors">
                 {editingId ? '保存修改' : '创建题目'}
               </button>
             </form>
