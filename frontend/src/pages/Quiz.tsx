@@ -15,10 +15,11 @@ export default function Quiz() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [score, setScore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [explanation, setExplanation] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const token = getAuthToken();
 
@@ -31,13 +32,13 @@ export default function Quiz() {
           headers: getAuthHeaders(true),
         });
         if (!res.ok) {
-          setStatus(await parseApiError(res, '题目加载失败'));
+          setNotice({ msg: await parseApiError(res, '题目加载失败'), type: 'error' });
           return;
         }
         const data = (await res.json()) as Question[];
         setQuestions(data);
       } catch {
-        setStatus('题目加载失败，请稍后重试');
+        setNotice({ msg: '题目加载失败，请稍后重试', type: 'error' });
       } finally {
         setLoading(false);
       }
@@ -50,7 +51,8 @@ export default function Quiz() {
     e.preventDefault();
     if (!selectedQuestionId || selectedOption === null || !token) return;
 
-    setStatus('提交中...');
+    setNotice({ msg: '提交中...', type: 'info' });
+    setSubmitting(true);
     try {
       const res = await fetch(`${apiBase}/api/quiz/questions/${selectedQuestionId}/submit`, {
         method: 'POST',
@@ -59,16 +61,22 @@ export default function Quiz() {
       });
 
       if (!res.ok) {
-        setStatus(await parseApiError(res, '提交失败'));
+        setNotice({ msg: await parseApiError(res, '提交失败'), type: 'error' });
         return;
       }
 
       const data = (await res.json()) as { correct: boolean; awarded: number; total_points: number; explanation?: string };
       setScore(data.total_points);
       setExplanation(data.explanation || null);
-      setStatus(data.correct ? `回答正确，+${data.awarded}分` : '回答错误');
+      setNotice({ msg: data.correct ? `回答正确，+${data.awarded}分` : '回答错误', type: data.correct ? 'success' : 'error' });
+      // Mark question as answered locally so UI updates immediately
+      setQuestions(prev => prev.map(q => q.id === selectedQuestionId ? { ...q, answered: true } : q));
+      setSelectedQuestionId('');
+      setSelectedOption(null);
     } catch {
-      setStatus('提交失败，请稍后重试');
+      setNotice({ msg: '提交失败，请稍后重试', type: 'error' });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -154,17 +162,17 @@ export default function Quiz() {
 
         <button
           type="submit"
-          disabled={loading || !selectedQuestionId || selectedOption === null || status === '提交中...'}
+          disabled={loading || !selectedQuestionId || selectedOption === null || submitting}
           className="w-full py-3 bg-sdu-red text-white rounded-lg font-medium hover:bg-sdu-red-hover disabled:opacity-50"
         >
-          {status === '提交中...' ? '提交中...' : '提交答案'}
+          {submitting ? '提交中...' : '提交答案'}
         </button>
       </form>
 
-      {status && status !== '提交中...' && (
+      {notice && !submitting && (
         <InlineNotice
-          message={status}
-          type={status.includes('正确') ? 'success' : 'error'}
+          message={notice.msg}
+          type={notice.type}
           className="mt-4"
         />
       )}

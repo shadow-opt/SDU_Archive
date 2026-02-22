@@ -18,6 +18,7 @@
 | 四 | [安装 Docker](#四安装-docker) | 5 分钟 |
 | 五 | [部署网站](#五部署网站) | 10 分钟 |
 | 六 | [域名与 HTTPS（可选）](#六域名与-https可选) | 30+ 分钟 |
+| 七 | [部署后自检（推荐）](#七部署后自检推荐) | 2 分钟 |
 
 ---
 
@@ -160,9 +161,8 @@ ufw allow 22
 ufw allow 80
 ufw allow 443
 
-# 允许项目用到的端口
+# 允许项目前端端口（用于 IP:端口直接访问测试，使用域名 + Caddy 后可移除）
 ufw allow 18080   # 前端
-ufw allow 18000   # 后端 API
 
 # 启用防火墙（输入 y 确认）
 ufw enable
@@ -185,7 +185,6 @@ ufw status
 | 80 | HTTP 网页访问 |
 | 443 | HTTPS 网页访问 |
 | 18080 | 本项目前端 |
-| 18000 | 本项目后端 API |
 
 > ⚠️ **千万不要忘记这一步！** 很多新手在服务器里配好了一切，浏览器却打不开，90% 的原因就是云平台的安全组没放行端口。
 
@@ -260,16 +259,38 @@ nano .env
 | 变量 | 说明 | 怎么填 |
 |------|------|--------|
 | `SECRET_KEY` | JWT 加密密钥，保护用户登录安全 | 在终端运行 `openssl rand -hex 32` 生成一串随机字符串，粘贴进去 |
-| `ADMIN_PASSWORD` | 管理员密码 | 换一个你自己的强密码 |
+| `ADMIN_PASSWORD` | 管理员密码（**必填，需包含字母和数字**） | 设为你自己的强密码 |
 
 可选修改：
 
 | 变量 | 说明 |
 |------|------|
-| `OPENAI_API_KEY` | 你的 OpenAI API Key。填了才有 AI 问答功能；留空网站也能跑，但 AI 相关功能不可用 |
+| `OPENAI_API_KEY` | AI 功能的 API 密钥。填了才有 AI 问答功能；留空网站也能跑，但 AI 相关功能不可用 |
+| `OPENAI_API_BASE` | AI API 地址，默认 `https://api.openai.com/v1`。支持任何兼容 OpenAI 格式的服务（见下表） |
+| `OPENAI_MODEL` | 模型名称，需与 `OPENAI_API_BASE` 匹配。默认 `gpt-4o-mini` |
 | `ADMIN_EMAIL` | 管理员邮箱，默认 `admin@example.com` |
 
-其他变量保持默认即可，无需修改。
+> 💡 **兼容的 AI 服务商**（便宜好用的国产模型也可以！）：
+>
+> | 服务商 | `OPENAI_API_BASE` | `OPENAI_MODEL` |
+> |--------|-------------------|----------------|
+> | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
+> | **DeepSeek（推荐）** | `https://api.deepseek.com` | `deepseek-chat` |
+> | 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` |
+> | 本地 Ollama | `http://localhost:11434/v1` | `qwen2.5` |
+
+其他变量说明（通常保持默认，无需修改）：
+
+| 变量 | 说明 | 默认值 | 需要改吗？ |
+|------|------|--------|:----------:|
+| `DATABASE_URL` | 数据库连接地址 | Docker 内部地址 | ❌ 不要改 |
+| `MINIO_ENDPOINT` | 对象存储地址 | Docker 内部默认值 | ❌ 不要改 |
+| `MINIO_ACCESS_KEY` / `MINIO_SECRET_KEY` | 对象存储凭证 | `minioadmin` | 可选 |
+| `MINIO_BUCKET` | 对象存储桶名 | `documents` | ❌ 不要改 |
+| `RATE_LIMIT_PER_MINUTE` | 每 IP 每分钟最大请求数 | `60` | 可选 |
+| `CORS_ORIGINS` | 允许访问的域名列表 | `localhost` | ⚠️ 绑定域名后**必须改** |
+
+> ⚠️ **关于 `CORS_ORIGINS`**：绑定域名后，务必将此值改为你的实际域名（例如 `https://yourdomain.com`），否则前端将无法正常请求后端 API。详见[第六步 HTTPS 配置](#64-配置-https使用-caddy-反向代理)。
 
 编辑完成后：按 `Ctrl + O` → 回车（保存） → `Ctrl + X`（退出编辑器）。
 
@@ -294,26 +315,43 @@ docker compose ps
 
 如果看到四个服务（`db`、`minio`、`api`、`frontend`）的状态都是 `Up` 或 `running (healthy)`，**部署成功了！** 🎉
 
-### 5.5 访问你的网站
+### 5.5 验证部署
 
-打开你电脑上的浏览器，在地址栏输入：
+容器全部启动后，先在**服务器终端**上验证各服务是否正常：
 
+```bash
+# 检查后端 API 健康状态
+curl -s http://localhost:18000/api/health
+# 应返回类似 {"status":"ok"} 的 JSON
+
+# 检查前端页面
+curl -sI http://localhost:18080 | head -n 1
+# 应返回 HTTP/1.1 200 OK
 ```
-http://你的服务器公网IP:18080
-```
 
-> 例如：`http://123.45.67.89:18080`
+如果两项检查都通过，说明**部署成功了！** 🎉
 
-你应该能看到 SDU Archive 的页面了！
+> 💡 **为什么要用 `curl` 而不是浏览器？**
+> 为了安全，`docker-compose.yml` 中所有端口均绑定到 `127.0.0.1`（仅本机可访问），外部浏览器无法直接通过 `http://IP:18080` 访问。这是推荐的生产配置——后续通过 Caddy 反向代理统一提供 HTTPS 访问（见[第六步](#六域名与-https可选)）。
+>
+> 如果你想在配置域名前先用浏览器预览网站，可以通过 **SSH 隧道**（在你**自己的电脑**上执行）：
+> ```bash
+> ssh -L 18080:localhost:18080 root@你的服务器IP
+> ```
+> 然后在浏览器打开 `http://localhost:18080` 即可预览。
 
 **默认管理员账号**：
 - 邮箱：你在 `.env` 中设置的 `ADMIN_EMAIL`（默认 `admin@example.com`）
 - 密码：你在 `.env` 中设置的 `ADMIN_PASSWORD`
+- 管理后台入口：`/admin/login`
 
-> ⚠️ 如果打不开，请检查：
-> 1. 服务器防火墙（UFW）是否放行了 18080 端口？
-> 2. 云平台安全组是否也放行了 18080？
-> 3. 运行 `docker compose logs` 查看是否有报错信息。
+> 🔒 **安全说明**：本系统**已关闭公开注册**，所有用户账号均由管理员在后台创建。登录管理后台后，进入「用户管理」页面，点击「+ 新建用户」按钮即可创建新用户并分配角色。
+
+> ⚠️ **如果 `curl` 检查失败？** 按以下顺序排查：
+> 1. `docker compose ps` 看四个容器是否都在运行。
+> 2. `docker compose logs api` 看后端是否报错。
+> 3. `docker compose logs frontend` 看前端 Nginx 是否报错。
+> 4. 如果是云平台，检查安全组是否放行了相应端口。
 
 ---
 
@@ -372,15 +410,15 @@ ping yoursite.com
 #### 安装 Caddy
 
 ```bash
-apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudflare.com/cloudflare-main.gpg' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg 2>/dev/null || true
-curl -1sLf 'https://dl.cloudflare.com/caddy/stable/deb/debian/setup.deb.sh' | bash 2>/dev/null || true
-# 使用官方仓库安装
-sudo apt install -y caddy 2>/dev/null || {
-  # 备选：直接用官方脚本
-  curl -fsSL https://caddyserver.com/api/download?os=linux\&arch=amd64 -o /usr/bin/caddy
-  chmod +x /usr/bin/caddy
-}
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+
+# 添加 Caddy 官方软件源
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+
+# 更新并安装
+sudo apt update
+sudo apt install caddy -y
 ```
 
 > 💡 如果上面的命令报错，可以访问 [Caddy 官方安装文档](https://caddyserver.com/docs/install#debian-ubuntu-raspbian) 获取最新安装方式。
@@ -421,6 +459,54 @@ https://yoursite.com
 
 看到地址栏的 🔒 和你的网站页面，就大功告成了！
 
+> 💡 **架构说明**：Caddy 只需要反代前端的 18080 端口。因为前端容器内部的 Nginx 已经配好了规则——所有 `/api/` 开头的请求会自动转发到后端，所以不需要单独给后端配反向代理。
+
+#### 更新 CORS 配置（重要！）
+
+绑定域名后，**必须更新** `.env` 中的 `CORS_ORIGINS`，否则前端将无法正常请求后端 API（浏览器会报跨域错误）：
+
+```bash
+cd ~/SDU_Archive
+nano .env
+```
+
+找到 `CORS_ORIGINS` 那一行，改为你的实际域名：
+
+```
+CORS_ORIGINS=https://yourdomain.com
+```
+
+保存退出后，重启服务使配置生效：
+
+```bash
+docker compose up -d
+```
+
+---
+
+## 七、部署后自检（推荐）
+
+部署完成后，建议运行项目自带的冒烟测试脚本，自动验证所有核心功能是否正常：
+
+```bash
+cd ~/SDU_Archive
+
+# 加载 .env 中的环境变量（脚本需要用管理员密码进行登录测试）
+set -a && source .env && set +a
+
+bash scripts/smoke.sh
+```
+
+脚本会依次检查：
+- ✅ API 健康接口可用
+- ✅ 前端首页可访问
+- ✅ 未登录请求返回 `401`（鉴权正常）
+- ✅ 管理员登录成功且角色正确
+- ✅ 管理员受保护接口可访问（仪表盘、切片管理、用户管理）
+- ✅ 题目创建与删除（写操作回归）
+
+全部通过后会输出 `✅ smoke passed`。如有失败项，脚本会打印具体错误信息，方便定位问题。
+
 ---
 
 ## 常见问题（FAQ）
@@ -432,8 +518,8 @@ https://yoursite.com
 **A**：按以下顺序排查：
 1. `docker compose ps` 看四个容器是否都在运行。
 2. `docker compose logs api` 看后端是否报错。
-3. `ufw status` 确认端口已放行。
-4. 去云平台控制台确认安全组也放行了对应端口。
+3. 如果通过域名访问：检查 Caddy 是否正常运行（`sudo systemctl status caddy`），DNS 是否解析到服务器 IP（`ping yoursite.com`）。
+4. 如果通过 `IP:18080` 访问：确认 UFW 和云平台安全组已放行 18080 端口。注意 `docker-compose.yml` 默认将端口绑定到 `127.0.0.1`，需要修改为 `0.0.0.0:18080:80` 才能从外部访问。
 
 ### Q：`docker compose up` 报错 `SECRET_KEY` 相关错误？
 **A**：你忘了配置 `.env` 文件。回到[第 5.2 节](#52-配置环境变量)操作。

@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "SDU Archive"
     secret_key: str  # Required: set via SECRET_KEY env var
-    access_token_expire_minutes: int = 60 * 24
+    access_token_expire_minutes: int = 60
     database_url: str = "postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive"
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "minioadmin"
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     minio_bucket: str = "documents"
     embedding_provider: str = "openai"
     openai_api_key: str | None = None
+    openai_api_base: str = "https://api.openai.com/v1"  # Compatible with any OpenAI-API provider
     openai_model: str = "gpt-4o-mini"  # Default to latest efficient model
     rate_limit_per_minute: int = 60
     admin_email: str | None = None

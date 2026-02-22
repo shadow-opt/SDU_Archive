@@ -29,6 +29,10 @@ export const fetcher = async (url: string) => {
     const authMessage = authErrorMessage(res.status);
     if (authMessage) {
       clearAuthToken();
+      // Auto-redirect to login page (avoid loop if already there)
+      if (res.status === 401 && !window.location.pathname.startsWith('/admin/login')) {
+        window.location.href = '/admin/login';
+      }
     }
     const error = new Error(authMessage ?? 'An error occurred while fetching the data.');
     // Attach extra info to the error object.

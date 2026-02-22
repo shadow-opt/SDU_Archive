@@ -3,6 +3,7 @@ import csv
 from io import StringIO
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -85,6 +86,8 @@ def delete_question(question_id: uuid.UUID, db: Session = Depends(get_db), _: st
     question = db.get(QuizQuestion, question_id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+    # Answers cascade via FK ondelete; explicitly delete for safety
+    db.query(AnswerRecord).filter(AnswerRecord.question_id == question_id).delete()
     db.delete(question)
     db.commit()
     return {"ok": True}
@@ -98,7 +101,10 @@ async def import_questions_csv(
 ):
     if not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="仅支持 CSV 文件")
-    content = (await file.read()).decode("utf-8")
+    raw = await file.read()
+    if len(raw) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="CSV 文件过大（最大 5 MB）")
+    content = raw.decode("utf-8")
     reader = csv.DictReader(StringIO(content))
     required_headers = {"prompt", "options", "correct_index", "points"}
     if not required_headers.issubset(set(reader.fieldnames or [])):
@@ -160,23 +166,34 @@ def submit_answer(
         )
     )
 
+    # Ensure UserScore row exists
     score = db.get(UserScore, current_user.id)
     if not score:
         score = UserScore(user_id=current_user.id, total_points=0, total_answers=0)
         db.add(score)
-    score.total_points += awarded
-    score.total_answers += 1
+        db.flush()  # persist before atomic update
+
+    # Atomic SQL update to avoid read-then-write race condition
+    db.execute(
+        sa_update(UserScore)
+        .where(UserScore.user_id == current_user.id)
+        .values(
+            total_points=UserScore.total_points + awarded,
+            total_answers=UserScore.total_answers + 1,
+        )
+    )
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=400, detail="Already answered")
-    db.refresh(score)
+
+    score = db.get(UserScore, current_user.id)
 
     return SubmissionResult(
         correct=is_correct,
         awarded=awarded,
-        total_points=score.total_points,
-        total_answers=score.total_answers,
+        total_points=score.total_points if score else awarded,
+        total_answers=score.total_answers if score else 1,
         explanation=question.explanation
     )

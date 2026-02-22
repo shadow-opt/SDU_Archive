@@ -1,8 +1,18 @@
+import re
 import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+
+
+def _check_password_complexity(v: str) -> str:
+    """Shared password complexity check for all password fields."""
+    if not re.search(r'[A-Za-z]', v):
+        raise ValueError('密码需包含至少一个字母')
+    if not re.search(r'\d', v):
+        raise ValueError('密码需包含至少一个数字')
+    return v
 
 
 class Token(BaseModel):
@@ -18,6 +28,23 @@ class TokenData(BaseModel):
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8)
+
+    @field_validator('password')
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _check_password_complexity(v)
+
+
+class UserCreateAdmin(BaseModel):
+    """Used by admin endpoint — includes role."""
+    email: EmailStr
+    password: str = Field(min_length=8)
+    role: str = "user"
+
+    @field_validator('password')
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _check_password_complexity(v)
 
 
 class UserOut(BaseModel):
@@ -56,6 +83,11 @@ class UserStatusUpdate(BaseModel):
 class UserPasswordReset(BaseModel):
     new_password: str = Field(min_length=8)
 
+    @field_validator('new_password')
+    @classmethod
+    def password_complexity(cls, v: str) -> str:
+        return _check_password_complexity(v)
+
 
 class DocumentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -78,7 +110,7 @@ class DocumentListResponse(BaseModel):
 
 
 class ChunkUpdate(BaseModel):
-    content: str
+    content: str = Field(max_length=50000)
 
 
 class ChunkOut(BaseModel):
@@ -102,7 +134,7 @@ class ChunkListResponse(BaseModel):
 
 
 class RagQuery(BaseModel):
-    query: str
+    query: str = Field(max_length=2000)
     top_k: int = Field(default=4, le=10)
 
 

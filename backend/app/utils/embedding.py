@@ -1,6 +1,7 @@
 import hashlib
 import json as _json
 import logging
+import threading
 from functools import lru_cache
 from typing import AsyncIterator, List
 
@@ -22,15 +23,17 @@ def _cached_hash_embedding(text: str) -> tuple:
 
 
 _embed_cache: dict[str, List[float]] = {}
+_embed_lock = threading.Lock()
 _EMBED_CACHE_MAX = 512
 
 
 def _put_embed_cache(text: str, vec: List[float]) -> None:
-    if len(_embed_cache) >= _EMBED_CACHE_MAX:
-        keys = list(_embed_cache.keys())[: _EMBED_CACHE_MAX // 4]
-        for k in keys:
-            _embed_cache.pop(k, None)
-    _embed_cache[text] = vec
+    with _embed_lock:
+        if len(_embed_cache) >= _EMBED_CACHE_MAX:
+            keys = list(_embed_cache.keys())[: _EMBED_CACHE_MAX // 4]
+            for k in keys:
+                _embed_cache.pop(k, None)
+        _embed_cache[text] = vec
 
 
 # ---------------------------------------------------------------------------
@@ -57,8 +60,9 @@ async def embed_text(text: str) -> List[float]:
     """
     clean = text.strip()
 
-    if clean in _embed_cache:
-        return _embed_cache[clean]
+    with _embed_lock:
+        if clean in _embed_cache:
+            return _embed_cache[clean]
 
     if settings.openai_api_key:
         headers = {
@@ -68,7 +72,7 @@ async def embed_text(text: str) -> List[float]:
         payload = {"model": "text-embedding-3-small", "input": clean}
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/embeddings",
+                f"{settings.openai_api_base}/embeddings",
                 headers=headers,
                 json=payload,
             )
@@ -104,7 +108,7 @@ async def embed_texts(texts: List[str]) -> List[List[float]]:
         payload = {"model": "text-embedding-3-small", "input": batch}
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/embeddings",
+                f"{settings.openai_api_base}/embeddings",
                 headers=headers,
                 json=payload,
             )
@@ -161,7 +165,7 @@ async def generate_answer(query: str, context: str) -> str:
         }
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
+                f"{settings.openai_api_base}/chat/completions",
                 headers=headers,
                 json=payload,
             )
@@ -200,7 +204,7 @@ async def generate_answer_stream(query: str, context: str) -> AsyncIterator[str]
     async with httpx.AsyncClient(timeout=60) as client:
         async with client.stream(
             "POST",
-            "https://api.openai.com/v1/chat/completions",
+            f"{settings.openai_api_base}/chat/completions",
             headers=headers,
             json=payload,
         ) as resp:

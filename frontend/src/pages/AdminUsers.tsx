@@ -36,15 +36,22 @@ export default function AdminUsers() {
   const [newStatus, setNewStatus] = useState(true);
   const [newPassword, setNewPassword] = useState('');
 
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // ─── Create user modal ────────────────────────────────────────
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createEmail, setCreateEmail] = useState('');
+  const [createPassword, setCreatePassword] = useState('');
+  const [createRole, setCreateRole] = useState<'admin' | 'user'>('user');
+  const [creating, setCreating] = useState(false);
 
   const hasPrev = skip > 0;
   const hasNext = skip + pageSize < total;
 
   const fetchUsers = async (nextSkip = skip, nextKeyword = appliedKeyword) => {
     setLoading(true);
-    setStatus('');
+    setNotice(null);
 
     const params = new URLSearchParams({
       skip: String(nextSkip),
@@ -59,7 +66,7 @@ export default function AdminUsers() {
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '加载用户失败'));
+        setNotice({ msg: await parseApiError(res, '加载用户失败'), type: 'error' });
         return;
       }
       const payload = (await res.json()) as UserListResponse;
@@ -67,7 +74,7 @@ export default function AdminUsers() {
       setTotal(payload.total);
       setSkip(payload.skip);
     } catch {
-      setStatus('加载用户失败，请稍后重试');
+      setNotice({ msg: '加载用户失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -90,7 +97,7 @@ export default function AdminUsers() {
     setNewStatus(user.is_active);
     setNewPassword('');
     setDrawerOpen(true);
-    setStatus('');
+    setNotice(null);
   };
 
   const refresh = async () => {
@@ -99,7 +106,7 @@ export default function AdminUsers() {
 
   const updateRole = async () => {
     if (!selected) return;
-    setStatus('角色更新中...');
+    setNotice({ msg: '角色更新中...', type: 'info' });
     try {
       const res = await fetch(`${apiBase}/api/admin/users/${selected.id}/role`, {
         method: 'PATCH',
@@ -107,19 +114,19 @@ export default function AdminUsers() {
         body: JSON.stringify({ role: newRole }),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '角色更新失败'));
+        setNotice({ msg: await parseApiError(res, '角色更新失败'), type: 'error' });
         return;
       }
-      setStatus('角色已更新');
+      setNotice({ msg: '角色已更新', type: 'success' });
       await refresh();
     } catch {
-      setStatus('角色更新失败，请稍后重试');
+      setNotice({ msg: '角色更新失败，请稍后重试', type: 'error' });
     }
   };
 
   const updateStatus = async () => {
     if (!selected) return;
-    setStatus('状态更新中...');
+    setNotice({ msg: '状态更新中...', type: 'info' });
     try {
       const res = await fetch(`${apiBase}/api/admin/users/${selected.id}/status`, {
         method: 'PATCH',
@@ -127,23 +134,23 @@ export default function AdminUsers() {
         body: JSON.stringify({ is_active: newStatus }),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '状态更新失败'));
+        setNotice({ msg: await parseApiError(res, '状态更新失败'), type: 'error' });
         return;
       }
-      setStatus('账号状态已更新');
+      setNotice({ msg: '账号状态已更新', type: 'success' });
       await refresh();
     } catch {
-      setStatus('状态更新失败，请稍后重试');
+      setNotice({ msg: '状态更新失败，请稍后重试', type: 'error' });
     }
   };
 
   const resetPassword = async () => {
     if (!selected) return;
     if (newPassword.length < 8) {
-      setStatus('新密码至少 8 位');
+      setNotice({ msg: '新密码至少 8 位', type: 'error' });
       return;
     }
-    setStatus('重置密码中...');
+    setNotice({ msg: '重置密码中...', type: 'info' });
     try {
       const res = await fetch(`${apiBase}/api/admin/users/${selected.id}/reset-password`, {
         method: 'POST',
@@ -151,13 +158,13 @@ export default function AdminUsers() {
         body: JSON.stringify({ new_password: newPassword }),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '重置密码失败'));
+        setNotice({ msg: await parseApiError(res, '重置密码失败'), type: 'error' });
         return;
       }
-      setStatus('密码已重置');
+      setNotice({ msg: '密码已重置', type: 'success' });
       setNewPassword('');
     } catch {
-      setStatus('重置密码失败，请稍后重试');
+      setNotice({ msg: '重置密码失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -168,13 +175,48 @@ export default function AdminUsers() {
     return `${from}-${to} / ${total}`;
   }, [skip, pageSize, total]);
 
+  const createUser = async () => {
+    if (!createEmail.trim() || createPassword.length < 8) {
+      setNotice({ msg: '请输入有效邮箱和至少 8 位密码', type: 'error' });
+      return;
+    }
+    setCreating(true);
+    setNotice({ msg: '创建用户中...', type: 'info' });
+    try {
+      const res = await fetch(`${apiBase}/api/admin/users`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ email: createEmail, password: createPassword, role: createRole }),
+      });
+      if (!res.ok) {
+        setNotice({ msg: await parseApiError(res, '创建用户失败'), type: 'error' });
+        return;
+      }
+      setNotice({ msg: '用户已创建', type: 'success' });
+      setCreateOpen(false);
+      setCreateEmail('');
+      setCreatePassword('');
+      setCreateRole('user');
+      await refresh();
+    } catch {
+      setNotice({ msg: '创建用户失败，请稍后重试', type: 'error' });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="bg-white rounded-2xl border border-ink-dark/10 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-2xl font-serif font-bold">用户管理</h2>
-        <button type="button" onClick={() => void refresh()} className="px-3 py-2 rounded-md border border-ink-dark/20 hover:border-sdu-red text-sm">
-          刷新
-        </button>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setCreateOpen(true)} className="px-3 py-2 rounded-md bg-sdu-red text-white hover:bg-sdu-red-hover text-sm">
+            + 新建用户
+          </button>
+          <button type="button" onClick={() => void refresh()} className="px-3 py-2 rounded-md border border-ink-dark/20 hover:border-sdu-red text-sm">
+            刷新
+          </button>
+        </div>
       </div>
 
       <form onSubmit={applySearch} className="grid grid-cols-1 md:grid-cols-4 gap-2 mb-4">
@@ -248,10 +290,10 @@ export default function AdminUsers() {
         </div>
       </div>
 
-      {status && (
+      {notice && (
         <InlineNotice
-          message={status}
-          type={status.includes('已') ? 'success' : status.includes('中') ? 'info' : 'error'}
+          message={notice.msg}
+          type={notice.type}
           className="mt-4"
         />
       )}
@@ -304,6 +346,56 @@ export default function AdminUsers() {
                   <button type="button" onClick={() => void resetPassword()} className="px-3 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover">重置</button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Create user modal ─── */}
+      {createOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setCreateOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-lg w-full max-w-md p-6 mx-4">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-xl font-serif font-bold">新建用户</h3>
+              <button type="button" onClick={() => setCreateOpen(false)} className="text-ink-light hover:text-ink-dark">关闭</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">邮箱</label>
+                <input
+                  type="email"
+                  value={createEmail}
+                  onChange={(e) => setCreateEmail(e.target.value)}
+                  placeholder="user@example.com"
+                  className="w-full px-3 py-2 rounded-lg border border-ink-dark/20"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">密码</label>
+                <input
+                  type="password"
+                  value={createPassword}
+                  onChange={(e) => setCreatePassword(e.target.value)}
+                  placeholder="至少 8 位"
+                  className="w-full px-3 py-2 rounded-lg border border-ink-dark/20"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">角色</label>
+                <select value={createRole} onChange={(e) => setCreateRole(e.target.value as 'admin' | 'user')} className="w-full px-3 py-2 rounded-lg border border-ink-dark/20">
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                disabled={creating}
+                onClick={() => void createUser()}
+                className="w-full py-2 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover disabled:opacity-50"
+              >
+                {creating ? '创建中...' : '创建用户'}
+              </button>
             </div>
           </div>
         </div>

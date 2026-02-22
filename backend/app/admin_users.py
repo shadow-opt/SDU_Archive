@@ -1,12 +1,14 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from .deps import get_db, rate_limiter, require_admin
+from .deps import get_db, escape_like, rate_limiter, require_admin
 from .models import User
 from .schemas import (
     UserAdminOut,
+    UserCreateAdmin,
     UserListResponse,
     UserPasswordReset,
     UserRoleUpdate,
@@ -15,6 +17,30 @@ from .schemas import (
 from .utils.security import get_password_hash
 
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"], dependencies=[Depends(rate_limiter)])
+
+
+@router.post("", response_model=UserAdminOut, status_code=201)
+def create_user(
+    payload: UserCreateAdmin,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Admin creates a new user with specified role."""
+    if payload.role not in {"admin", "user"}:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="该邮箱已存在")
+    user = User(
+        email=payload.email,
+        password_hash=get_password_hash(payload.password),
+        role=payload.role,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
 
 
 @router.get("", response_model=UserListResponse)
@@ -30,7 +56,7 @@ def list_users(
     query = db.query(User)
 
     if q:
-        query = query.filter(User.email.ilike(f"%{q.strip()}%"))
+        query = query.filter(User.email.ilike(f"%{escape_like(q.strip())}%"))
     if role:
         query = query.filter(User.role == role)
     if is_active is not None:

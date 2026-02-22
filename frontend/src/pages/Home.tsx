@@ -8,7 +8,6 @@ interface Citation {
 }
 
 export default function Home() {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState<string | null>(null);
@@ -26,21 +25,9 @@ export default function Home() {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus(mode === 'login' ? '登录中...' : '注册中...');
+    setStatus('登录中...');
 
     try {
-      if (mode === 'register') {
-        const registerRes = await fetch(`${apiBase}/api/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        if (!registerRes.ok) {
-          const err = await registerRes.json().catch(() => ({}));
-          throw new Error(err.detail || '注册失败');
-        }
-      }
-
       const form = new FormData();
       form.append('username', email);
       form.append('password', password);
@@ -193,19 +180,10 @@ export default function Home() {
               type="submit"
               className="w-full py-3 bg-sdu-red text-white rounded-lg font-medium hover:bg-sdu-red-hover transition-colors"
             >
-              {mode === 'login' ? '登录并开始检索' : '注册并登录'}
+              登录并开始检索
             </button>
           </form>
-          <div className="mt-4 text-sm text-ink-light">
-            当前模式：{mode === 'login' ? '登录' : '注册'}，
-            <button
-              type="button"
-              className="text-sdu-red ml-1 hover:underline"
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-            >
-              切换到{mode === 'login' ? '注册' : '登录'}
-            </button>
-          </div>
+          <p className="mt-4 text-sm text-ink-light">账号由管理员创建，如需开通请联系管理员。</p>
         </div>
       ) : (
         <div className="mb-6 text-sm text-ink-light">

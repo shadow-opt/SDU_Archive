@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 
-from .deps import get_db, rate_limiter, require_admin
+from .deps import get_db, escape_like, rate_limiter, require_admin
 from .models import Chunk
 from .schemas import ChunkListResponse, ChunkOut, ChunkUpdate
 from .utils.embedding import embed_text
@@ -29,18 +29,18 @@ def _chunk_to_out(chunk: Chunk) -> ChunkOut:
 
 @router.get("/", response_model=ChunkListResponse)
 def list_chunks(
-    skip: int = 0,
+    skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, le=200),
     q: str | None = Query(default=None, min_length=1),
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    query = db.query(Chunk).options(joinedload(Chunk.document))
+    base_query = db.query(Chunk)
     if q:
-        like_pattern = f"%{q}%"
-        query = query.filter(or_(Chunk.content.ilike(like_pattern), Chunk.source_url.ilike(like_pattern)))
-    total = query.count()
-    chunks = query.order_by(Chunk.updated_at.desc()).offset(skip).limit(limit).all()
+        like_pattern = f"%{escape_like(q)}%"
+        base_query = base_query.filter(or_(Chunk.content.ilike(like_pattern), Chunk.source_url.ilike(like_pattern)))
+    total = base_query.count()
+    chunks = base_query.options(joinedload(Chunk.document)).order_by(Chunk.updated_at.desc()).offset(skip).limit(limit).all()
 
     return ChunkListResponse(
         items=[_chunk_to_out(c) for c in chunks],

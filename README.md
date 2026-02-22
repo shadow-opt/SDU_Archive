@@ -3,7 +3,7 @@
 山东大学校史互动档案库（RAG + 题库），面向 2~4GB 内存主机的低资源、一键容器化方案。
 
 ## 功能介绍
-- **鉴权与风控**：JWT 登录/注册，区分普通用户与超级管理员；Nginx 反代 + 后端漏桶限流，避免高频滥用。
+- **鉴权与风控**：JWT 登录鉴权，区分普通用户与超级管理员；Nginx 反代 + 后端漏桶限流，避免高频滥用。
 - **档案上传与管理**（管理员）：支持文本/图片/PDF（≤100MB），入库即自动分块与向量化；支持文档列表查看与删除，切片精修或删除。
 - **史实问答（RAG）**：向量检索 + SSE 流式输出，返回引用片段与来源；未命中直接回复"暂无记载"，降低幻觉。
 - **互动题库与积分**：题目 CRUD（管理员）、CSV 批量导入；用户答题得分并累计积分，防重复作答，已答题目自动标记。
@@ -23,30 +23,33 @@
 2) 可选：在环境中导出 `OPENAI_API_KEY`（有语义嵌入与AI问答需求时）。
 3) 启动：
 ```bash
-docker compose up --build
+docker compose up -d --build
 ```
 4) 访问：
-- 前端（Nginx 静态 + 反代）：`http://localhost:18080`（可用 `FRONTEND_HOST_PORT` 覆盖）
-- 后端 API（直接）：`http://localhost:18000`（可用 `API_HOST_PORT` 覆盖）
-- Postgres（宿主机映射）：`localhost:15433`（可用 `POSTGRES_HOST_PORT` 覆盖）
-- MinIO API（宿主机映射）：`http://localhost:19002`（可用 `MINIO_API_PORT` 覆盖）
-- MinIO Console（宿主机映射）：`http://localhost:19003`（可用 `MINIO_CONSOLE_PORT` 覆盖）
+- 前端（Nginx 静态 + 反代）：`http://localhost:18080`（可用 `FRONTEND_HOST_PORT` 覆盖，默认 `18080`）
+- 后端 API（仅本机）：`http://127.0.0.1:18000`（可用 `API_HOST_PORT` 覆盖，默认 `18000`，仅供内部调试）
+- Postgres（仅本机）：`127.0.0.1:15433`（可用 `POSTGRES_HOST_PORT` 覆盖，默认 `15433`）
+- MinIO API（仅本机）：`http://127.0.0.1:19002`（可用 `MINIO_API_PORT` 覆盖，默认 `19002`）
+- MinIO Console（仅本机）：`http://127.0.0.1:19003`（可用 `MINIO_CONSOLE_PORT` 覆盖，默认 `19003`）
+
+> 🔒 所有端口均绑定到 `127.0.0.1`，外部网络无法直接访问。生产环境建议通过 Caddy 等反向代理提供 HTTPS 访问，详见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
 ### 默认管理员账号
 **邮箱**: `admin@example.com`
-**密码**: `admin12345678`
+**密码**: 由环境变量 `ADMIN_PASSWORD` 设置（**必填，需包含字母和数字**）
 
-> ⚠️ **重要安全提示**：首次部署后请立即修改默认管理员密码！可通过环境变量 `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 自定义。建议使用 `openssl rand -hex 32` 生成强密码。
+> ⚠️ **重要安全提示**：`ADMIN_PASSWORD` 是必填环境变量，未设置时容器将拒绝启动。可通过环境变量 `ADMIN_EMAIL` 自定义邮箱。建议使用 `openssl rand -hex 32` 生成强密码。
 
 > 说明：公开检索页面需要先登录后才能发起查询请求。档案上传功能仅对管理员开放。
 
 ### 环境变量（可在 docker-compose 或 `.env` 中配置）
 - `OPENAI_API_KEY`（可选）：用于语义嵌入和AI回答生成。未配置时使用哈希向量（仅演示）。
-- `OPENAI_MODEL`（可选）：LLM模型选择，默认 `gpt-4o-mini`（推荐），可选 `gpt-4o`、`gpt-3.5-turbo`。
+- `OPENAI_API_BASE`（可选）：AI API 地址，默认 `https://api.openai.com/v1`。可改为任何兼容 OpenAI 格式的服务（如 DeepSeek `https://api.deepseek.com`、通义千问等），配合 `OPENAI_MODEL` 使用。
+- `OPENAI_MODEL`（可选）：LLM模型选择，默认 `gpt-4o-mini`。可根据 `OPENAI_API_BASE` 所指向的服务选择对应模型（如 DeepSeek 用 `deepseek-chat`）。
 - `DATABASE_URL`：Postgres 连接串，默认 `postgresql+psycopg2://sdu:sdu@db:5432/sdu_archive`。
 - `MINIO_ENDPOINT/MINIO_ACCESS_KEY/MINIO_SECRET_KEY/MINIO_BUCKET`：对象存储配置，默认内置 MinIO。
 - `SECRET_KEY`：JWT 签名密钥（**生产环境必须修改**，建议 `openssl rand -hex 32` 生成）。
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD`：启动时自动创建的超级管理员（**生产环境请务必修改默认密码**）。
+- `ADMIN_EMAIL` / `ADMIN_PASSWORD`：启动时自动创建的超级管理员（**`ADMIN_PASSWORD` 为必填项，需包含字母和数字**）。
 - `RATE_LIMIT_PER_MINUTE`：后端漏桶限流阈值，默认 60。
 - `CORS_ORIGINS`：允许的跨域来源，默认 `http://localhost:18080,http://localhost:3000`。
 
@@ -55,7 +58,7 @@ docker compose up --build
 ## 操作指南
 
 ### 普通用户
-1) **登录/注册**：前端首页输入邮箱与密码。
+1) **登录**：前端首页输入邮箱与密码（账号由管理员在后台创建）。
 2) **史实问答（AI RAG）**：登录后在搜索框输入问题，AI 将基于档案内容流式生成回答并提供引用来源；无命中则提示"暂无记载"。
 3) **互动题库**：在"互动题库"页选择未答题目并作答，系统判分并累计积分；已答题目自动灰显标记，全部答完展示完成页面。
 
@@ -93,6 +96,7 @@ npm run dev    # 启动 Vite dev server，默认 http://localhost:5173
 - `backend/`：FastAPI 服务代码、依赖（`backend/requirements.txt`）、容器构建（`backend/Dockerfile`）。
 - `frontend/`：Vite React 前端、样式与 Nginx 配置。
 - `docker-compose.yml`：统一编排 Postgres+pgvector、MinIO、API、前端网关。
+- `.env.example`：环境变量模板，首次部署前复制为 `.env` 并修改。
 
 ## 常见问题
 - **`python:3.11-slim ... EOF` 拉取失败**：这是镜像仓库网络问题，不是代码错误。建议按顺序执行：
@@ -102,6 +106,6 @@ npm run dev    # 启动 Vite dev server，默认 http://localhost:5173
    如仍失败，重试或配置 Docker 镜像代理。
 - **无法联网时的嵌入**：未提供外部 API Key 时使用哈希向量，检索仅作演示，请在生产环境配置真实嵌入服务。
 - **文件类型受限**：仅允许文本/图片/PDF（安全与需求所限）；音视频未纳入当前范围。
-- **端口冲突**：可通过环境变量覆盖宿主机映射端口：
-   `FRONTEND_HOST_PORT`、`API_HOST_PORT`、`POSTGRES_HOST_PORT`、`MINIO_API_PORT`、`MINIO_CONSOLE_PORT`。
+- **端口冲突**：可通过环境变量覆盖宿主机映射端口（默认值见括号）：
+   `FRONTEND_HOST_PORT` (18080)、`API_HOST_PORT` (18000)、`POSTGRES_HOST_PORT` (15433)、`MINIO_API_PORT` (19002)、`MINIO_CONSOLE_PORT` (19003)。
 - **SSE 流式回答延迟**：Nginx 已配置 `proxy_buffering off`；若使用其他反代，请确认关闭 SSE 缓冲。

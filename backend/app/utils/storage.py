@@ -46,5 +46,14 @@ def save_bytes(object_name: str, data: bytes, content_type: str) -> str:
     return f"{settings.minio_bucket}/{object_name}"
 
 
+def remove_file(object_name: str) -> None:
+    """Delete an object from MinIO. Silently ignores missing objects."""
+    try:
+        ensure_bucket()
+        client.remove_object(settings.minio_bucket, object_name)
+    except Exception:
+        pass  # best-effort cleanup
+
+
 def local_path_to_object_name(path: str) -> str:
     return Path(path).name

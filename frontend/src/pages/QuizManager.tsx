@@ -38,7 +38,7 @@ export default function QuizManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadQuestions = async () => {
@@ -48,13 +48,13 @@ export default function QuizManager() {
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '加载题目失败'));
+        setNotice({ msg: await parseApiError(res, '加载题目失败'), type: 'error' });
         return;
       }
       const data = (await res.json()) as Question[];
       setQuestions(data);
     } catch {
-      setStatus('加载题目失败，请稍后重试');
+      setNotice({ msg: '加载题目失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -74,15 +74,15 @@ export default function QuizManager() {
     e.preventDefault();
     const parsedOptions = form.options.map((o) => o.trim()).filter(Boolean);
     if (parsedOptions.length < 2) {
-      setStatus('至少保留两个选项');
+      setNotice({ msg: '至少保留两个选项', type: 'error' });
       return;
     }
     if (form.correct_index < 0 || form.correct_index >= parsedOptions.length) {
-      setStatus('正确答案序号超出范围');
+      setNotice({ msg: '正确答案序号超出范围', type: 'error' });
       return;
     }
 
-    setStatus(editingId ? '更新中...' : '创建中...');
+    setNotice({ msg: editingId ? '更新中...' : '创建中...', type: 'info' });
     try {
       const url = editingId ? `${apiBase}/api/quiz/questions/${editingId}` : `${apiBase}/api/quiz/questions`;
       const method = editingId ? 'PUT' : 'POST';
@@ -100,34 +100,34 @@ export default function QuizManager() {
       });
 
       if (!res.ok) {
-        setStatus(await parseApiError(res, editingId ? '更新失败' : '创建失败'));
+        setNotice({ msg: await parseApiError(res, editingId ? '更新失败' : '创建失败'), type: 'error' });
         return;
       }
 
-      setStatus(editingId ? '题目已更新' : '题目已创建');
+      setNotice({ msg: editingId ? '题目已更新' : '题目已创建', type: 'success' });
       resetDrawer();
       await loadQuestions();
     } catch {
-      setStatus(editingId ? '更新失败，请稍后重试' : '创建失败，请稍后重试');
+      setNotice({ msg: editingId ? '更新失败，请稍后重试' : '创建失败，请稍后重试', type: 'error' });
     }
   };
 
   const deleteQuestion = async (questionId: string) => {
     if (!window.confirm('确定要删除该题目吗？此操作不可恢复。')) return;
-    setStatus('删除中...');
+    setNotice({ msg: '删除中...', type: 'info' });
     try {
       const res = await fetch(`${apiBase}/api/quiz/questions/${questionId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '删除失败'));
+        setNotice({ msg: await parseApiError(res, '删除失败'), type: 'error' });
         return;
       }
-      setStatus('题目已删除');
+      setNotice({ msg: '题目已删除', type: 'success' });
       await loadQuestions();
     } catch {
-      setStatus('删除失败，请稍后重试');
+      setNotice({ msg: '删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -167,7 +167,7 @@ export default function QuizManager() {
   const onImportCsv = async (file: File | null) => {
     if (!file) return;
     setImporting(true);
-    setStatus('批量导入中...');
+    setNotice({ msg: '批量导入中...', type: 'info' });
     const body = new FormData();
     body.append('file', file);
     try {
@@ -179,14 +179,14 @@ export default function QuizManager() {
         body,
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '导入失败'));
+        setNotice({ msg: await parseApiError(res, '导入失败'), type: 'error' });
         return;
       }
       const payload = (await res.json()) as { created?: number };
-      setStatus(`导入完成，新增 ${payload.created ?? 0} 道题`);
+      setNotice({ msg: `导入完成，新增 ${payload.created ?? 0} 道题`, type: 'success' });
       await loadQuestions();
     } catch {
-      setStatus('导入失败，请稍后重试');
+      setNotice({ msg: '导入失败，请稍后重试', type: 'error' });
     } finally {
       setImporting(false);
     }
@@ -296,10 +296,10 @@ export default function QuizManager() {
 
       {loading && <p className="text-sm text-ink-light mt-3">加载中...</p>}
 
-      {status && (
+      {notice && (
         <InlineNotice
-          message={status}
-          type={status.includes('已创建') || status.includes('已删除') || status.includes('已更新') || status.includes('导入完成') ? 'success' : status.includes('中...') ? 'info' : 'error'}
+          message={notice.msg}
+          type={notice.type}
           className="mt-4"
         />
       )}

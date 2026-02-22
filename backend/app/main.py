@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+import re as _re
+
 from . import auth, documents, rag, chunks, quiz, dashboard, admin_users
 from .config import get_settings
 from .database import Base, engine, init_db, get_session
@@ -27,7 +29,7 @@ async def lifespan(app: FastAPI):
     # Shutdown (nothing needed)
 
 
-app = FastAPI(title=settings.app_name, lifespan=lifespan)
+app = FastAPI(title=settings.app_name, lifespan=lifespan, docs_url=None, redoc_url=None)
 
 # Parse CORS origins from comma-separated string
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -36,8 +38,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 app.include_router(auth.router)
@@ -54,10 +56,21 @@ def health():
     return {"ok": True}
 
 
+def _validate_admin_password(pw: str) -> None:
+    """Raise if the initial admin password is too weak."""
+    if len(pw) < 8:
+        raise ValueError("ADMIN_PASSWORD 长度不足 8 位")
+    if not _re.search(r'[A-Za-z]', pw):
+        raise ValueError("ADMIN_PASSWORD 需包含至少一个字母")
+    if not _re.search(r'\d', pw):
+        raise ValueError("ADMIN_PASSWORD 需包含至少一个数字")
+
+
 def ensure_admin(db: Session):
     if settings.admin_email and settings.admin_password:
         existing = db.query(User).filter(User.email == settings.admin_email).first()
         if not existing:
+            _validate_admin_password(settings.admin_password)
             admin = User(
                 id=uuid.uuid4(),
                 email=settings.admin_email,
@@ -95,8 +108,6 @@ def run_compat_migrations():
         "CREATE INDEX IF NOT EXISTS idx_answer_records_question_id ON answer_records(question_id)",
         # HNSW index for fast vector similarity search
         "CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops)",
-        # Drop deprecated quiz_submissions table (merged into answer_records)
-        "DROP TABLE IF EXISTS quiz_submissions",
     ]
 
     with engine.begin() as conn:

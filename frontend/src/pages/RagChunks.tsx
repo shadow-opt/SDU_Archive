@@ -24,12 +24,12 @@ export default function RagChunks() {
   const [appliedKeyword, setAppliedKeyword] = useState('');
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const loadChunks = async (nextSkip = 0, nextKeyword = appliedKeyword, append = false) => {
     setLoading(true);
-    setStatus('');
+    setNotice(null);
     try {
       const params = new URLSearchParams({
         limit: String(pageSize),
@@ -43,7 +43,7 @@ export default function RagChunks() {
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '加载切片失败'));
+        setNotice({ msg: await parseApiError(res, '加载切片失败'), type: 'error' });
         return;
       }
       const data = (await res.json()) as { items: Chunk[]; total: number };
@@ -52,7 +52,7 @@ export default function RagChunks() {
       setSkip(nextSkip);
       setHasMore(nextSkip + data.items.length < data.total);
     } catch {
-      setStatus('加载切片失败，请稍后重试');
+      setNotice({ msg: '加载切片失败，请稍后重试', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -65,14 +65,14 @@ export default function RagChunks() {
   const openEditor = (chunk: Chunk) => {
     setSelected(chunk);
     setContent(chunk.content);
-    setStatus('');
+    setNotice(null);
   };
 
   const saveChunk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
 
-    setStatus('保存中...');
+    setNotice({ msg: '保存中...', type: 'info' });
     try {
       const res = await fetch(`${apiBase}/api/chunks/${selected.id}`, {
         method: 'PATCH',
@@ -80,21 +80,21 @@ export default function RagChunks() {
         body: JSON.stringify({ content }),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '保存失败'));
+        setNotice({ msg: await parseApiError(res, '保存失败'), type: 'error' });
         return;
       }
-      setStatus('切片已更新并重嵌入');
+      setNotice({ msg: '切片已更新并重嵌入', type: 'success' });
       setSelected(null);
       await loadChunks(skip, appliedKeyword, false);
     } catch {
-      setStatus('保存失败，请稍后重试');
+      setNotice({ msg: '保存失败，请稍后重试', type: 'error' });
     }
   };
 
   const deleteChunk = async () => {
     if (!selected) return;
     if (!window.confirm('确定要删除该切片吗？此操作不可恢复。')) return;
-    setStatus('删除中...');
+    setNotice({ msg: '删除中...', type: 'info' });
 
     try {
       const res = await fetch(`${apiBase}/api/chunks/${selected.id}`, {
@@ -102,15 +102,15 @@ export default function RagChunks() {
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {
-        setStatus(await parseApiError(res, '删除失败'));
+        setNotice({ msg: await parseApiError(res, '删除失败'), type: 'error' });
         return;
       }
-      setStatus('切片已删除');
+      setNotice({ msg: '切片已删除', type: 'success' });
       setSelected(null);
       setContent('');
       await loadChunks(0, appliedKeyword, false);
     } catch {
-      setStatus('删除失败，请稍后重试');
+      setNotice({ msg: '删除失败，请稍后重试', type: 'error' });
     }
   };
 
@@ -209,10 +209,10 @@ export default function RagChunks() {
         </div>
       )}
 
-      {status && (
+      {notice && (
         <InlineNotice
-          message={status}
-          type={status.includes('已更新') || status.includes('已删除') ? 'success' : status.includes('中...') ? 'info' : 'error'}
+          message={notice.msg}
+          type={notice.type}
           className="mt-4"
         />
       )}

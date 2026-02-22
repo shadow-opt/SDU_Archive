@@ -1,30 +1,22 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from .deps import get_db, rate_limiter, get_current_user
+from .deps import get_db, rate_limiter, login_rate_limiter, get_current_user
 from .models import User
-from .schemas import Token, UserCreate, UserOut
-from .utils.security import create_access_token, get_password_hash, verify_password
+from .schemas import Token, UserOut
+from .utils.security import create_access_token, verify_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=UserOut, dependencies=[Depends(rate_limiter)])
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == user_in.email).first()
-    if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
-    user = User(email=user_in.email, password_hash=get_password_hash(user_in.password), role="user", created_at=datetime.now(timezone.utc))
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
+@router.post("/register", status_code=403, dependencies=[Depends(rate_limiter)])
+def register():
+    """Public registration is disabled. Accounts are created by administrators."""
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="公开注册已关闭，请联系管理员创建账号")
 
 
-@router.post("/login", response_model=Token, dependencies=[Depends(rate_limiter)])
+@router.post("/login", response_model=Token, dependencies=[Depends(rate_limiter), Depends(login_rate_limiter)])
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == form_data.username).first()
     if not user or not verify_password(form_data.password, user.password_hash):

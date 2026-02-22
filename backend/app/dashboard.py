@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from .deps import get_db, require_admin
+from .deps import get_db, rate_limiter, require_admin
 from .models import AnswerRecord, QuizQuestion, User, UserScore
 from .schemas import DashboardKpi, DashboardSummary, TopUserItem, WrongQuestionItem
 
-router = APIRouter(prefix="/api/admin/dashboard", tags=["admin-dashboard"])
+router = APIRouter(prefix="/api/admin/dashboard", tags=["admin-dashboard"], dependencies=[Depends(rate_limiter)])
 
 
 @router.get("", response_model=DashboardSummary)

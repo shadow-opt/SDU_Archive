@@ -6,12 +6,14 @@ import InlineNotice from '../components/InlineNotice';
 export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('登录中...');
+    setNotice(null);
+    setLoggingIn(true);
     
     const form = new FormData();
     form.append('username', email);
@@ -23,7 +25,10 @@ export default function AdminLogin() {
         body: form,
       });
 
-      if (!res.ok) throw new Error('登录失败，请检查邮箱或密码');
+      if (!res.ok) {
+        const msg = await parseApiError(res, '登录失败，请检查邮箱或密码');
+        throw new Error(msg);
+      }
 
       const data = await res.json();
       localStorage.setItem('token', data.access_token);
@@ -43,10 +48,12 @@ export default function AdminLogin() {
         throw new Error('仅超级管理员可访问后台');
       }
 
-      setStatus('登录成功');
+      setNotice({ msg: '登录成功', type: 'success' });
       navigate('/admin/dashboard');
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : '登录失败');
+      setNotice({ msg: err instanceof Error ? err.message : '登录失败', type: 'error' });
+    } finally {
+      setLoggingIn(false);
     }
   };
 
@@ -80,14 +87,14 @@ export default function AdminLogin() {
             />
           </div>
           
-          {status && <InlineNotice message={status} type={status.includes('成功') ? 'success' : 'error'} />}
+          {notice && <InlineNotice message={notice.msg} type={notice.type} />}
 
           <button
             type="submit"
-            disabled={status === '登录中...'}
+            disabled={loggingIn}
             className="w-full py-3 bg-sdu-red text-white rounded-lg font-medium hover:bg-sdu-red-hover transition-colors disabled:opacity-50"
           >
-            {status === '登录中...' ? '请稍候...' : '登录'}
+            {loggingIn ? '请稍候...' : '登录'}
           </button>
         </form>
       </div>

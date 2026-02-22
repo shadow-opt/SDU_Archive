@@ -61,15 +61,16 @@ curl -fsS "${API_URL}/api/chunks?limit=1&q=test" -H "Authorization: Bearer ${tok
 echo "[7/11] admin dashboard summary"
 curl -fsS "${API_URL}/api/admin/dashboard" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[8/11] user register for user-management checks"
+echo "[8/11] admin creates test user for user-management checks"
 test_user_email="smoke_user_$(date +%s)@example.com"
-test_user_password="smoke12345"
+test_user_password="Smoke12345"
 register_code=$(curl -s -o /tmp/sdu_smoke_register.out -w "%{http_code}" \
-  -X POST "${API_URL}/api/auth/register" \
+  -X POST "${API_URL}/api/admin/users" \
+  -H "Authorization: Bearer ${token}" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"${test_user_email}\",\"password\":\"${test_user_password}\"}")
-if [[ "${register_code}" != "200" ]]; then
-  echo "ERROR: user register failed, code=${register_code}" >&2
+  -d "{\"email\":\"${test_user_email}\",\"password\":\"${test_user_password}\",\"role\":\"user\"}")
+if [[ "${register_code}" != "201" ]]; then
+  echo "ERROR: admin create-user failed, code=${register_code}" >&2
   cat /tmp/sdu_smoke_register.out >&2 || true
   exit 1
 fi

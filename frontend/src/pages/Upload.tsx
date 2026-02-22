@@ -28,7 +28,7 @@ export default function Upload() {
   const [docType, setDocType] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [tasks, setTasks] = useState<UploadTask[]>([]);
-  const [status, setStatus] = useState('');
+  const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [uploading, setUploading] = useState(false);
 
   // Document list state
@@ -59,10 +59,10 @@ export default function Upload() {
     if (!window.confirm('确定要删除该文档及其所有切片吗？此操作不可恢复。')) return;
     try {
       const res = await fetch(`${apiBase}/api/documents/${docId}`, { method: 'DELETE', headers: getAuthHeaders(true) });
-      if (!res.ok) { setStatus(await parseApiError(res, '删除失败')); return; }
-      setStatus('文档已删除');
+      if (!res.ok) { setNotice({ msg: await parseApiError(res, '删除失败'), type: 'error' }); return; }
+      setNotice({ msg: '文档已删除', type: 'success' });
       await fetchDocs(docsSkip);
-    } catch { setStatus('删除失败'); }
+    } catch { setNotice({ msg: '删除失败', type: 'error' }); }
   };
 
   const totalSizeMb = useMemo(() => files.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024, [files]);
@@ -76,7 +76,7 @@ export default function Upload() {
     const next = Array.from(selected);
     const tooLarge = next.find((f) => f.size > 100 * 1024 * 1024);
     if (tooLarge) {
-      setStatus(`文件 ${tooLarge.name} 超过 100MB 限制`);
+      setNotice({ msg: `文件 ${tooLarge.name} 超过 100MB 限制`, type: 'error' });
       return;
     }
     setFiles(next);
@@ -96,10 +96,10 @@ export default function Upload() {
     e.preventDefault();
     if (!files.length) return;
     
-    setStatus('上传任务进行中...');
+    setNotice({ msg: '上传任务进行中...', type: 'info' });
     const token = getAuthToken();
     if (!token) {
-      setStatus('请先登录管理员账号');
+      setNotice({ msg: '请先登录管理员账号', type: 'error' });
       return;
     }
     setUploading(true);
@@ -128,22 +128,20 @@ export default function Upload() {
           continue;
         }
 
-        updateTask(task.id, { stage: 'chunking', message: '文本切分中...' });
-        await sleep(400);
-        updateTask(task.id, { stage: 'embedding', message: '向量化入库中...' });
-        await sleep(500);
+        // Server completes chunking + embedding before responding;
+        // mark as done immediately.
         updateTask(task.id, { stage: 'done', message: '完成' });
         successCount += 1;
       }
 
-      setStatus(`任务完成：${successCount}/${tasks.length} 个文件成功`);
+      setNotice({ msg: `任务完成：${successCount}/${tasks.length} 个文件成功`, type: successCount > 0 ? 'success' : 'error' });
       setTitle('');
       setDescription('');
       setYearOrPeriod('');
       setDocType('');
       await fetchDocs(0);
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : '上传失败');
+      setNotice({ msg: err instanceof Error ? err.message : '上传失败', type: 'error' });
     } finally {
       setUploading(false);
     }
@@ -255,7 +253,7 @@ export default function Upload() {
           </div>
         )}
 
-        {status && <InlineNotice message={status} type={status.includes('成功') ? 'success' : 'error'} />}
+        {notice && <InlineNotice message={notice.msg} type={notice.type} />}
 
         <button
           type="submit"
