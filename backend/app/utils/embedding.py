@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 def _cached_hash_embedding(text: str) -> tuple:
     """Cache hash-fallback embeddings so identical text isn't recomputed."""
     digest = hashlib.sha256(text.encode("utf-8")).digest()
-    return tuple((digest[i % len(digest)] - 128) / 128.0 for i in range(1536))
+    return tuple(
+        (digest[i % len(digest)] - 128) / 128.0
+        for i in range(settings.embedding_dimension)
+    )
 
 
 _embed_cache: dict[str, List[float]] = {}
@@ -34,6 +37,17 @@ def _put_embed_cache(text: str, vec: List[float]) -> None:
             for k in keys:
                 _embed_cache.pop(k, None)
         _embed_cache[text] = vec
+
+
+def _ensure_embedding_dimension(vec: List[float]) -> List[float]:
+    expected = settings.embedding_dimension
+    actual = len(vec)
+    if actual != expected:
+        raise ValueError(
+            f"Embedding 维度不匹配：期望 {expected}，实际 {actual}。"
+            "请检查 EMBEDDING_MODEL 与 EMBEDDING_DIMENSION 配置。"
+        )
+    return vec
 
 
 # ---------------------------------------------------------------------------
@@ -55,7 +69,7 @@ async def embed_text(text: str) -> List[float]:
     """
     Embed *text* into a 1536-dim vector.
 
-    • OpenAI key present  → calls text-embedding-3-small
+    • Embedding key present  → calls configured embeddings model
     • No key              → deterministic SHA-256 hash fallback (not semantic)
     """
     clean = text.strip()
@@ -64,25 +78,25 @@ async def embed_text(text: str) -> List[float]:
         if clean in _embed_cache:
             return _embed_cache[clean]
 
-    if settings.openai_api_key:
+    if settings.embedding_api_key:
         headers = {
-            "Authorization": f"Bearer {settings.openai_api_key}",
+            "Authorization": f"Bearer {settings.embedding_api_key}",
             "Content-Type": "application/json",
         }
-        payload = {"model": "text-embedding-3-small", "input": clean}
+        payload = {"model": settings.embedding_model, "input": clean}
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
-                f"{settings.openai_api_base}/embeddings",
+                f"{settings.embedding_api_base}/embeddings",
                 headers=headers,
                 json=payload,
             )
             resp.raise_for_status()
-            vec = resp.json()["data"][0]["embedding"]
+            vec = _ensure_embedding_dimension(resp.json()["data"][0]["embedding"])
             _put_embed_cache(clean, vec)
             return vec
 
     # Fallback – deterministic hash embedding (no semantic meaning)
-    vec = list(_cached_hash_embedding(clean))
+    vec = _ensure_embedding_dimension(list(_cached_hash_embedding(clean)))
     _put_embed_cache(clean, vec)
     return vec
 
@@ -94,21 +108,21 @@ async def embed_texts(texts: List[str]) -> List[List[float]]:
     """Embed multiple texts.  Uses the OpenAI batch API when available."""
     cleaned = [t.strip() for t in texts]
 
-    if not settings.openai_api_key:
-        return [list(_cached_hash_embedding(t)) for t in cleaned]
+    if not settings.embedding_api_key:
+        return [_ensure_embedding_dimension(list(_cached_hash_embedding(t))) for t in cleaned]
 
     BATCH = 64
     all_vecs: List[List[float]] = [[] for _ in cleaned]
     for start in range(0, len(cleaned), BATCH):
         batch = cleaned[start : start + BATCH]
         headers = {
-            "Authorization": f"Bearer {settings.openai_api_key}",
+            "Authorization": f"Bearer {settings.embedding_api_key}",
             "Content-Type": "application/json",
         }
-        payload = {"model": "text-embedding-3-small", "input": batch}
+        payload = {"model": settings.embedding_model, "input": batch}
         async with httpx.AsyncClient(timeout=30) as client:
             resp = await client.post(
-                f"{settings.openai_api_base}/embeddings",
+                f"{settings.embedding_api_base}/embeddings",
                 headers=headers,
                 json=payload,
             )
@@ -117,7 +131,7 @@ async def embed_texts(texts: List[str]) -> List[List[float]]:
             data.sort(key=lambda d: d["index"])
             for i, item in enumerate(data):
                 idx = start + i
-                vec = item["embedding"]
+                vec = _ensure_embedding_dimension(item["embedding"])
                 all_vecs[idx] = vec
                 _put_embed_cache(cleaned[idx], vec)
     return all_vecs

@@ -1,8 +1,9 @@
 import json as _json
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy.exc import StatementError
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -59,8 +60,15 @@ async def query_rag(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    query_embedding = await embed_text(payload.query)
-    results = _retrieve(db, query_embedding, payload.top_k)
+    try:
+        query_embedding = await embed_text(payload.query)
+        results = _retrieve(db, query_embedding, payload.top_k)
+    except (ValueError, StatementError) as exc:
+        logger.exception("RAG retrieve failed: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="向量检索配置错误：请检查 EMBEDDING_MODEL 与 EMBEDDING_DIMENSION 是否一致",
+        )
 
     if not results:
         return RagResponse(answer="暂无相关档案记载。", citations=[], degraded=False)
@@ -86,8 +94,14 @@ async def query_rag_stream(
     db: Session = Depends(get_db),
     _: str = Depends(get_current_user),
 ):
-    query_embedding = await embed_text(payload.query)
-    results = _retrieve(db, query_embedding, payload.top_k)
+    try:
+        query_embedding = await embed_text(payload.query)
+        results = _retrieve(db, query_embedding, payload.top_k)
+    except (ValueError, StatementError):
+        async def _dim_error():
+            yield f"data: {_json.dumps({'error': '向量检索配置错误：请检查 EMBEDDING_MODEL 与 EMBEDDING_DIMENSION 是否一致', 'done': True}, ensure_ascii=False)}\n\n"
+
+        return StreamingResponse(_dim_error(), media_type="text/event-stream")
 
     if not results:
         async def _empty():

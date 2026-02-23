@@ -90,7 +90,7 @@ export default function Upload() {
     );
   };
 
-  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  // const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();

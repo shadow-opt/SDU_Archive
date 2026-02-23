@@ -4,7 +4,7 @@ set -euo pipefail
 API_URL="${API_BASE_URL:-http://localhost:${API_HOST_PORT:-18000}}"
 FRONTEND_URL="${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_HOST_PORT:-18080}}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin12345678}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin12345678}"
 
 echo "[1/11] health check: ${API_URL}/api/health"
 curl -fsS "${API_URL}/api/health" >/dev/null
@@ -118,7 +118,30 @@ if [[ -z "${question_id}" ]]; then
   exit 1
 fi
 
+curl -N -X POST "${API_URL}/api/rag/stream" \
+  -H "Authorization: Bearer ${token}" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"山东大学建校时间？"}' > /tmp/sdu_rag_stream.out
+
+if grep -qi '"error"' /tmp/sdu_rag_stream.out; then
+  echo "ERROR: rag stream returned error payload" >&2
+  cat /tmp/sdu_rag_stream.out >&2 || true
+  exit 1
+fi
+
+
 curl -fsS -X DELETE "${API_URL}/api/quiz/questions/${question_id}" \
   -H "Authorization: Bearer ${token}" >/dev/null
+
+rag_auth_code=$(curl -s -o /tmp/sdu_rag_query.out -w "%{http_code}" -X POST "${API_URL}/api/rag/query" \
+  -H "Authorization: Bearer ${token}" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"山东大学建校时间？"}')
+
+if [[ "${rag_auth_code}" != "200" ]]; then
+  echo "ERROR: expected 200 from auth RAG query, got ${rag_auth_code}" >&2
+  cat /tmp/sdu_rag_query.out >&2 || true
+  exit 1
+fi
 
 echo "✅ smoke passed"
