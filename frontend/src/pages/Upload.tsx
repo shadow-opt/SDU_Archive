@@ -42,13 +42,18 @@ export default function Upload() {
     setDocsLoading(true);
     try {
       const params = new URLSearchParams({ skip: String(nextSkip), limit: String(docsPageSize) });
-      const res = await fetch(`${apiBase}/api/documents?${params}`, { headers: getAuthHeaders(true) });
-      if (!res.ok) return;
+      const res = await fetch(`${apiBase}/api/documents/?${params}`, { headers: getAuthHeaders(true) });
+      if (!res.ok) {
+        setNotice({ msg: await parseApiError(res, '加载文档列表失败'), type: 'error' });
+        return;
+      }
       const data = (await res.json()) as { items: DocItem[]; total: number };
       setDocs(data.items);
       setDocsTotal(data.total);
       setDocsSkip(nextSkip);
-    } catch { /* ignore */ } finally {
+    } catch {
+      setNotice({ msg: '加载文档列表失败，请稍后重试', type: 'error' });
+    } finally {
       setDocsLoading(false);
     }
   };
@@ -134,7 +139,14 @@ export default function Upload() {
         successCount += 1;
       }
 
-      setNotice({ msg: `任务完成：${successCount}/${tasks.length} 个文件成功`, type: successCount > 0 ? 'success' : 'error' });
+      const failedCount = tasks.length - successCount;
+      const noticeType: 'success' | 'error' | 'info' =
+        successCount === tasks.length ? 'success' : successCount > 0 ? 'info' : 'error';
+      const noticeMsg =
+        failedCount === 0
+          ? `任务完成：${successCount}/${tasks.length} 个文件成功`
+          : `任务部分完成：成功 ${successCount} 个，失败 ${failedCount} 个`;
+      setNotice({ msg: noticeMsg, type: noticeType });
       setTitle('');
       setDescription('');
       setYearOrPeriod('');
