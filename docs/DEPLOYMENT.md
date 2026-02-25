@@ -290,7 +290,7 @@ nano .env
 | `RATE_LIMIT_PER_MINUTE` | 每 IP 每分钟最大请求数 | `60` | 可选 |
 | `CORS_ORIGINS` | 允许访问的域名列表 | `localhost` | ⚠️ 绑定域名后**必须改** |
 
-> ⚠️ **关于 `CORS_ORIGINS`**：绑定域名后，务必将此值改为你的实际域名（例如 `https://yourdomain.com`），否则前端将无法正常请求后端 API。详见[第六步 HTTPS 配置](#64-配置-https使用-caddy-反向代理)。
+> ⚠️ **关于 `CORS_ORIGINS`**：绑定域名后，务必将此值改为你的实际域名（例如 `https://yourdomain.com`），否则前端将无法正常请求后端 API。详见[第六步的架构选择与 CORS 更新](#64-先选架构不要混乱叠加)。
 
 编辑完成后：按 `Ctrl + O` → 回车（保存） → `Ctrl + X`（退出编辑器）。
 
@@ -322,7 +322,7 @@ docker compose ps
 ```bash
 # 检查后端 API 健康状态
 curl -s http://localhost:18000/api/health
-# 应返回类似 {"status":"ok"} 的 JSON
+# 应返回类似 {"ok": true} 的 JSON
 
 # 检查前端页面
 curl -sI http://localhost:18080 | head -n 1
@@ -383,104 +383,185 @@ curl -sI http://localhost:18080 | head -n 1
 
 挑一个你喜欢的域名，完成购买。
 
-### 6.3 解析域名到服务器
+### 6.3 先做这一步：一分钟选架构（最关键）
 
-在域名注册商的 DNS 管理页面，添加一条 **A 记录**：
+你现在会遇到的核心问题是：项目默认端口绑定在 `127.0.0.1`，外部（包括 Cloudflare）无法直接访问。
 
-| 记录类型 | 主机记录 | 记录值 | TTL |
-|---------|---------|--------|-----|
-| A | `@` | 你的服务器公网 IP | 600 |
-| A | `www` | 你的服务器公网 IP | 600 |
+先看结论：
 
-> `@` 代表根域名（`yoursite.com`），`www` 代表 `www.yoursite.com`。
+- **Cloudflare 和 Caddy 不冲突**。
+- 真正会出问题的是 **Cloudflare SSL 模式** 与 **你的源站监听方式** 不匹配。
 
-设置好后等几分钟，在终端验证：
+两条路线二选一（不要混搭）：
+
+| 路线 | 适合谁 | 源站端口策略 | Cloudflare SSL | 安全性 |
+|------|--------|-------------|-----------------|--------|
+| A：仅 Cloudflare（不装 Caddy） | 想最快跑通 | 前端对公网开放 80 | `Flexible` | 中 |
+| B：Cloudflare + Caddy（推荐） | 想长期稳定 | 容器继续仅本机，Caddy 暴露 80/443 | `Full (strict)` | 高 |
+
+> 记忆口诀：
+> - **有 Caddy -> 用 `Full (strict)`**
+> - **没 Caddy -> 才考虑 `Flexible`**
+
+### 6.4 配置 Cloudflare DNS（两条路线都要做）
+
+在 Cloudflare 的 DNS 页面添加两条 A 记录：
+
+| 记录类型 | 名称 | 记录值 | 代理状态 | TTL |
+|---------|------|--------|---------|-----|
+| A | `@` | 你的服务器公网 IP | 橙云（Proxied） | Auto |
+| A | `www` | 你的服务器公网 IP | 橙云（Proxied） | Auto |
+
+验证解析：
 
 ```bash
 ping yoursite.com
-# 如果解析成功，会显示你服务器的 IP
 ```
 
-### 6.4 配置 HTTPS（使用 Caddy 反向代理）
+> 橙云开启时，`ping` 显示的是 Cloudflare IP，不是你服务器 IP，这是正常现象。
 
-为了让网站可以通过 `https://yoursite.com`（不带端口号）访问，你需要一个**反向代理**把 80/443 端口的请求转发到项目的 18080 端口，并自动申请 SSL 证书。
+### 6.5 路线 A：仅 Cloudflare（不安装 Caddy）
 
-这里推荐 **Caddy**——它是对新手最友好的方案，**自动申请和续期 HTTPS 证书**，几行配置就搞定。
+这条路线最简单，适合先恢复站点可访问。
 
-#### 安装 Caddy
+#### 第 1 步：把前端改为公网可达
+
+编辑根目录 `docker-compose.yml`，将前端端口从：
+
+```yaml
+- "127.0.0.1:${FRONTEND_HOST_PORT:-18080}:80"
+```
+
+改成：
+
+```yaml
+- "0.0.0.0:80:80"
+```
+
+然后重启前端：
+
+```bash
+cd ~/SDU_Archive
+docker compose up -d --build frontend
+```
+
+#### 第 2 步：放行防火墙
+
+```bash
+sudo ufw allow 80
+sudo ufw status
+```
+
+并在云平台安全组放行 80 端口。
+
+#### 第 3 步：设置 Cloudflare SSL
+
+- Cloudflare -> `SSL/TLS` -> `Overview`
+- 选择 **Flexible**
+
+#### 第 4 步：验证
+
+```bash
+curl -I http://127.0.0.1
+curl -I http://你的公网IP
+```
+
+都返回 `200` 或 `301` 后，再访问 `https://yoursite.com`。
+
+### 6.6 路线 B：Cloudflare + Caddy（推荐）
+
+这条路线安全性更高，也是生产推荐。
+
+#### 第 1 步：保持 `docker-compose.yml` 默认绑定
+
+不要改 `127.0.0.1:${FRONTEND_HOST_PORT:-18080}:80`，让前端继续只在本机提供服务。
+
+#### 第 2 步：安装 Caddy
 
 ```bash
 sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-
-# 添加 Caddy 官方软件源
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-
-# 更新并安装
 sudo apt update
 sudo apt install caddy -y
 ```
 
-> 💡 如果上面的命令报错，可以访问 [Caddy 官方安装文档](https://caddyserver.com/docs/install#debian-ubuntu-raspbian) 获取最新安装方式。
-
-#### 编写配置文件
+#### 第 3 步：配置 Caddy 反代
 
 ```bash
-nano /etc/caddy/Caddyfile
+sudo nano /etc/caddy/Caddyfile
 ```
 
-将内容替换为（把 `yoursite.com` 换成你的真实域名）：
+填入：
 
 ```
 yoursite.com {
-    reverse_proxy localhost:18080
+   reverse_proxy localhost:18080
 }
 ```
 
-是的，**就这两行**。Caddy 会自动：
-1. 监听 80 和 443 端口。
-2. 向 Let's Encrypt 申请免费 SSL 证书。
-3. 把所有 HTTP 请求自动跳转到 HTTPS。
-4. 把请求转发给你运行在 18080 端口的前端。
-
-保存退出后，重启 Caddy：
+生效：
 
 ```bash
 sudo systemctl restart caddy
+sudo systemctl status caddy
 ```
 
-#### 验证
+#### 第 4 步：放行 80/443
 
-等待约 30 秒，打开浏览器访问：
-
+```bash
+sudo ufw allow 80
+sudo ufw allow 443
+sudo ufw status
 ```
-https://yoursite.com
-```
 
-看到地址栏的 🔒 和你的网站页面，就大功告成了！
+云平台安全组也要放行 80、443。
 
-> 💡 **架构说明**：Caddy 只需要反代前端的 18080 端口。因为前端容器内部的 Nginx 已经配好了规则——所有 `/api/` 开头的请求会自动转发到后端，所以不需要单独给后端配反向代理。
+#### 第 5 步：设置 Cloudflare SSL
 
-#### 更新 CORS 配置（重要！）
+- Cloudflare -> `SSL/TLS` -> `Overview`
+- 选择 **Full (strict)**
 
-绑定域名后，**必须更新** `.env` 中的 `CORS_ORIGINS`，否则前端将无法正常请求后端 API（浏览器会报跨域错误）：
+### 6.7 绑定域名后更新 CORS（两条路线都必须）
 
 ```bash
 cd ~/SDU_Archive
 nano .env
 ```
 
-找到 `CORS_ORIGINS` 那一行，改为你的实际域名：
+改为：
 
 ```
-CORS_ORIGINS=https://yourdomain.com
+CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 ```
 
-保存退出后，重启服务使配置生效：
+然后重启：
 
 ```bash
 docker compose up -d
 ```
+
+### 6.8 Cloudflare 会不会和 Caddy 冲突？
+
+**不会冲突**，前提是 SSL 模式匹配。
+
+常见错误与后果：
+
+| 错误配置 | 典型现象 | 修正办法 |
+|---------|----------|---------|
+| 有 Caddy，但 Cloudflare 设成 `Flexible` | 重定向循环、HTTPS 异常 | 改成 `Full (strict)` |
+| 无 Caddy，Cloudflare 设成 `Full/Strict`，源站无 443 | `521/525` | 改 `Flexible`，或给源站补 443 |
+| 前端只绑定 `127.0.0.1`，但又不装 Caddy | `521` | 改为公网监听，或使用 Caddy |
+
+### 6.9 Cloudflare 521 专项排查（按顺序）
+
+1. `docker compose ps`
+2. `curl -I http://127.0.0.1:18080`
+3. 路线 A 额外查：`curl -I http://你的公网IP`
+4. `ss -lntp | grep -E ':80|:443|:18080'`
+5. `ufw status` + 云平台安全组
+6. 检查 Cloudflare SSL 是否与路线匹配
+7. DNS 是否为当前服务器
 
 ---
 
@@ -518,8 +599,9 @@ bash scripts/smoke.sh
 **A**：按以下顺序排查：
 1. `docker compose ps` 看四个容器是否都在运行。
 2. `docker compose logs api` 看后端是否报错。
-3. 如果通过域名访问：检查 Caddy 是否正常运行（`sudo systemctl status caddy`），DNS 是否解析到服务器 IP（`ping yoursite.com`）。
-4. 如果通过 `IP:18080` 访问：确认 UFW 和云平台安全组已放行 18080 端口。注意 `docker-compose.yml` 默认将端口绑定到 `127.0.0.1`，需要修改为 `0.0.0.0:18080:80` 才能从外部访问。
+3. 如果你是 **方案 A（仅 Cloudflare）**：确认前端已对外监听（如 `0.0.0.0:80:80`），并且 Cloudflare SSL 模式是 `Flexible`。
+4. 如果你是 **方案 B（Cloudflare + Caddy）**：检查 Caddy 是否正常运行（`sudo systemctl status caddy`），并确认 Cloudflare SSL 模式是 `Full (strict)`。
+5. 无论哪种方案，都检查 UFW 和云平台安全组端口放行是否与方案一致（A 需要 80；B 需要 80/443）。
 
 ### Q：`docker compose up` 报错 `SECRET_KEY` 相关错误？
 **A**：你忘了配置 `.env` 文件。回到[第 5.2 节](#52-配置环境变量)操作。

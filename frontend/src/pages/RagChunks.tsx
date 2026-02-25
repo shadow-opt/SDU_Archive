@@ -39,7 +39,7 @@ export default function RagChunks() {
         params.set('q', nextKeyword.trim());
       }
 
-      const res = await fetch(`${apiBase}/api/chunks?${params.toString()}`, {
+      const res = await fetch(`${apiBase}/api/chunks/?${params.toString()}`, {
         headers: getAuthHeaders(true),
       });
       if (!res.ok) {

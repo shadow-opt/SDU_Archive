@@ -1,9 +1,11 @@
 import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 
 from .deps import get_db, escape_like, rate_limiter, require_admin
 from .models import Chunk
@@ -11,6 +13,7 @@ from .schemas import ChunkListResponse, ChunkOut, ChunkUpdate
 from .utils.embedding import embed_text
 
 router = APIRouter(prefix="/api/chunks", tags=["chunks"], dependencies=[Depends(rate_limiter)])
+logger = logging.getLogger(__name__)
 
 
 def _chunk_to_out(chunk: Chunk) -> ChunkOut:
@@ -35,19 +38,23 @@ def list_chunks(
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    base_query = db.query(Chunk)
-    if q:
-        like_pattern = f"%{escape_like(q)}%"
-        base_query = base_query.filter(or_(Chunk.content.ilike(like_pattern), Chunk.source_url.ilike(like_pattern)))
-    total = base_query.count()
-    chunks = base_query.options(joinedload(Chunk.document)).order_by(Chunk.updated_at.desc()).offset(skip).limit(limit).all()
+    try:
+        base_query = db.query(Chunk)
+        if q:
+            like_pattern = f"%{escape_like(q)}%"
+            base_query = base_query.filter(or_(Chunk.content.ilike(like_pattern), Chunk.source_url.ilike(like_pattern)))
+        total = base_query.count()
+        chunks = base_query.options(joinedload(Chunk.document)).order_by(Chunk.updated_at.desc()).offset(skip).limit(limit).all()
 
-    return ChunkListResponse(
-        items=[_chunk_to_out(c) for c in chunks],
-        total=total,
-        skip=skip,
-        limit=limit,
-    )
+        return ChunkListResponse(
+            items=[_chunk_to_out(c) for c in chunks],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
+    except SQLAlchemyError:
+        logger.exception("Failed to list chunks")
+        raise HTTPException(status_code=500, detail="切片列表加载失败，请稍后重试")
 
 
 @router.patch("/{chunk_id}", response_model=ChunkOut)

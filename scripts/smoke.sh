@@ -6,13 +6,13 @@ FRONTEND_URL="${FRONTEND_BASE_URL:-http://localhost:${FRONTEND_HOST_PORT:-18080}
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin12345678}"
 
-echo "[1/11] health check: ${API_URL}/api/health"
+echo "[1/12] health check: ${API_URL}/api/health"
 curl -fsS "${API_URL}/api/health" >/dev/null
 
-echo "[2/11] frontend check: ${FRONTEND_URL}"
+echo "[2/12] frontend check: ${FRONTEND_URL}"
 curl -fsSI "${FRONTEND_URL}" | head -n 1 >/dev/null
 
-echo "[3/11] unauth RAG must be 401"
+echo "[3/12] unauth RAG must be 401"
 rag_code=$(curl -s -o /tmp/sdu_rag_unauth.out -w "%{http_code}" \
   -X POST "${API_URL}/api/rag/query" \
   -H "Content-Type: application/json" \
@@ -23,7 +23,7 @@ if [[ "${rag_code}" != "401" ]]; then
   exit 1
 fi
 
-echo "[4/11] admin login + /me role check"
+echo "[4/12] admin login + /me role check"
 login_json=$(curl -fsS -X POST "${API_URL}/api/auth/login" \
   -F "username=${ADMIN_EMAIL}" \
   -F "password=${ADMIN_PASSWORD}")
@@ -52,16 +52,70 @@ if [[ "${role}" != "admin" ]]; then
   exit 1
 fi
 
-echo "[5/11] admin endpoint check: /api/chunks"
+echo "[5/12] upload -> documents/chunks visibility check"
+smoke_file="/tmp/sdu_smoke_upload_$$.txt"
+printf 'smoke upload at %s\n' "$(date -u +%FT%TZ)" > "${smoke_file}"
+
+upload_json=$(curl -fsS -X POST "${API_URL}/api/documents/upload" \
+  -H "Authorization: Bearer ${token}" \
+  -F "title=smoke-upload-${RANDOM}" \
+  -F "file=@${smoke_file};type=text/plain")
+
+uploaded_doc_id=$(python3 - <<'PY' "$upload_json"
+import json,sys
+obj=json.loads(sys.argv[1])
+print(obj.get('id',''))
+PY
+)
+
+if [[ -z "${uploaded_doc_id}" ]]; then
+  echo "ERROR: upload did not return document id" >&2
+  exit 1
+fi
+
+docs_json=$(curl -fsS "${API_URL}/api/documents/?limit=50" -H "Authorization: Bearer ${token}")
+doc_visible=$(python3 - <<'PY' "$docs_json" "$uploaded_doc_id"
+import json,sys
+payload=json.loads(sys.argv[1])
+target=sys.argv[2]
+for item in payload.get('items',[]):
+    if str(item.get('id',''))==target:
+        print('1')
+        break
+else:
+    print('0')
+PY
+)
+if [[ "${doc_visible}" != "1" ]]; then
+  echo "ERROR: uploaded document not visible in /api/documents/ list" >&2
+  exit 1
+fi
+
+chunks_json=$(curl -fsS "${API_URL}/api/chunks/?document_id=${uploaded_doc_id}&limit=10" -H "Authorization: Bearer ${token}")
+chunk_count=$(python3 - <<'PY' "$chunks_json"
+import json,sys
+payload=json.loads(sys.argv[1])
+print(len(payload.get('items',[])))
+PY
+)
+if [[ "${chunk_count}" -lt "1" ]]; then
+  echo "ERROR: uploaded document has no visible chunks in /api/chunks/" >&2
+  exit 1
+fi
+
+curl -fsS -X DELETE "${API_URL}/api/documents/${uploaded_doc_id}" \
+  -H "Authorization: Bearer ${token}" >/dev/null
+
+echo "[6/12] admin endpoint check: /api/chunks"
 curl -fsS "${API_URL}/api/chunks?limit=1" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[6/11] admin chunk search endpoint"
+echo "[7/12] admin chunk search endpoint"
 curl -fsS "${API_URL}/api/chunks?limit=1&q=test" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[7/11] admin dashboard summary"
+echo "[8/12] admin dashboard summary"
 curl -fsS "${API_URL}/api/admin/dashboard" -H "Authorization: Bearer ${token}" >/dev/null
 
-echo "[8/11] admin creates test user for user-management checks"
+echo "[9/12] admin creates test user for user-management checks"
 test_user_email="smoke_user_$(date +%s)@example.com"
 test_user_password="Smoke12345"
 register_code=$(curl -s -o /tmp/sdu_smoke_register.out -w "%{http_code}" \
@@ -75,7 +129,7 @@ if [[ "${register_code}" != "201" ]]; then
   exit 1
 fi
 
-echo "[9/11] admin users list endpoint"
+echo "[10/12] admin users list endpoint"
 list_json=$(curl -fsS "${API_URL}/api/admin/users?limit=100" -H "Authorization: Bearer ${token}")
 test_user_id=$(python3 - <<'PY' "$list_json" "$test_user_email"
 import json,sys
@@ -94,13 +148,13 @@ if [[ -z "${test_user_id}" ]]; then
   exit 1
 fi
 
-echo "[10/11] admin user status toggle"
+echo "[11/12] admin user status toggle"
 curl -fsS -X PATCH "${API_URL}/api/admin/users/${test_user_id}/status" \
   -H "Authorization: Bearer ${token}" \
   -H "Content-Type: application/json" \
   -d '{"is_active":false}' >/dev/null
 
-echo "[11/11] admin quiz create + delete"
+echo "[12/12] admin quiz create + delete"
 create_json=$(curl -fsS -X POST "${API_URL}/api/quiz/questions" \
   -H "Authorization: Bearer ${token}" \
   -H "Content-Type: application/json" \
