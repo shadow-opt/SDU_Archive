@@ -136,6 +136,8 @@ class ChunkListResponse(BaseModel):
 class RagQuery(BaseModel):
     query: str = Field(max_length=2000)
     top_k: int = Field(default=4, le=10)
+    conversation_id: Optional[uuid.UUID] = None
+    history_window: int = Field(default=4, ge=0, le=12)
 
 
 class RagCitation(BaseModel):
@@ -148,6 +150,7 @@ class RagResponse(BaseModel):
     answer: str
     citations: List[RagCitation]
     degraded: bool = False
+    conversation_id: Optional[uuid.UUID] = None
 
 
 class QuestionCreate(BaseModel):

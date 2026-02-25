@@ -2,7 +2,9 @@ import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -30,6 +32,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan, docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    response: Response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    return response
 
 # Parse CORS origins from comma-separated string
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
@@ -109,6 +120,25 @@ def run_compat_migrations():
         """,
         "CREATE INDEX IF NOT EXISTS idx_answer_records_user_id ON answer_records(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_answer_records_question_id ON answer_records(question_id)",
+        """
+        CREATE TABLE IF NOT EXISTS conversations (
+            id UUID PRIMARY KEY,
+            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+            id UUID PRIMARY KEY,
+            conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+            role VARCHAR(16) NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        "CREATE INDEX IF NOT EXISTS idx_conversations_user_updated ON conversations(user_id, updated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at ASC)",
         # HNSW index for fast vector similarity search
         "CREATE INDEX IF NOT EXISTS idx_chunks_embedding ON chunks USING hnsw (embedding vector_cosine_ops)",
     ]

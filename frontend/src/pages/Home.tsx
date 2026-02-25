@@ -8,9 +8,11 @@ interface Citation {
 }
 
 export default function Home() {
+  const HISTORY_WINDOW = 4;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [token, setToken] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [answer, setAnswer] = useState('');
   const [citations, setCitations] = useState<Citation[]>([]);
@@ -55,9 +57,19 @@ export default function Home() {
   const handleLogout = () => {
     clearAuthToken();
     setToken(null);
+    setActiveConversationId(null);
     setAnswer('');
     setCitations([]);
     setStatus('已退出登录');
+  };
+
+  const handleNewConversation = () => {
+    setActiveConversationId(null);
+    setQuery('');
+    setAnswer('');
+    setCitations([]);
+    setStatus('已切换到新对话');
+    setIsAnswerExpanded(false);
   };
 
   // ─── SSE streaming search ───────────────────────────────────────────
@@ -86,7 +98,11 @@ export default function Home() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({
+          query,
+          conversation_id: activeConversationId,
+          history_window: HISTORY_WINDOW,
+        }),
         signal: controller.signal,
       });
 
@@ -120,6 +136,9 @@ export default function Home() {
             if (payload.citations) {
               setCitations(payload.citations);
             }
+            if (payload.conversation_id) {
+              setActiveConversationId(payload.conversation_id);
+            }
             if (payload.text) {
               setAnswer((prev) => prev + payload.text);
             }
@@ -139,7 +158,7 @@ export default function Home() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [query, token]);
+  }, [activeConversationId, query, token]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-3xl mx-auto text-center">
@@ -188,6 +207,14 @@ export default function Home() {
       ) : (
         <div className="mb-6 text-sm text-ink-light">
           已登录，可开始检索。
+          <button
+            type="button"
+            onClick={handleNewConversation}
+            className="ml-2 text-sdu-red hover:underline"
+            disabled={streaming}
+          >
+            新对话
+          </button>
           <button type="button" onClick={handleLogout} className="ml-2 text-sdu-red hover:underline">
             退出登录
           </button>
