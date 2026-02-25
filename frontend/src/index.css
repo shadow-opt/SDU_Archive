@@ -3,7 +3,19 @@
 @tailwind utilities;
 
 @layer base {
+  * {
+    @apply border-ink-dark/10;
+  }
+
   body {
     @apply bg-paper-bg text-ink-dark font-sans antialiased;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  ::selection {
+    @apply bg-sdu-red/20 text-ink-dark;
   }
 }
