@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):
     run_compat_migrations()
     with get_session() as db:
         ensure_admin(db)
+        quiz.ensure_quiz_collections(db)
     yield
     # Shutdown (nothing needed)
 
@@ -103,14 +104,29 @@ def run_compat_migrations():
         "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS source_url VARCHAR(255) NOT NULL DEFAULT ''",
         "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
         "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        """
+        CREATE TABLE IF NOT EXISTS quiz_collections (
+            id UUID PRIMARY KEY,
+            title VARCHAR(255) NOT NULL UNIQUE,
+            description TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            is_published BOOLEAN NOT NULL DEFAULT TRUE,
+            created_by UUID REFERENCES users(id),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+        """,
+        "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES quiz_collections(id)",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type VARCHAR(32) NOT NULL DEFAULT 'single_choice'",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS explanation TEXT",
+        "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
         "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS total_answers INTEGER NOT NULL DEFAULT 0",
         """
         CREATE TABLE IF NOT EXISTS answer_records (
             id UUID PRIMARY KEY,
             user_id UUID NOT NULL REFERENCES users(id),
-            question_id UUID NOT NULL REFERENCES quiz_questions(id),
+            question_id UUID NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
             selected_index INTEGER NOT NULL,
             is_correct BOOLEAN NOT NULL DEFAULT FALSE,
             points_awarded INTEGER NOT NULL DEFAULT 0,
@@ -120,6 +136,7 @@ def run_compat_migrations():
         """,
         "CREATE INDEX IF NOT EXISTS idx_answer_records_user_id ON answer_records(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_answer_records_question_id ON answer_records(question_id)",
+        "CREATE INDEX IF NOT EXISTS idx_quiz_questions_collection_id ON quiz_questions(collection_id)",
         """
         CREATE TABLE IF NOT EXISTS conversations (
             id UUID PRIMARY KEY,

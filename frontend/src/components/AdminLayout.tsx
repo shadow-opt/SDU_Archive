@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import useSWR from 'swr';
 import { clearAuthToken, fetcher } from '../services/api';
+import BrandLogo from './BrandLogo';
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -27,8 +28,15 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen flex bg-gray-50">
       <aside className="w-64 bg-ink-dark text-white flex flex-col">
-        <div className="h-16 flex items-center px-6 border-b border-white/10 font-serif font-bold text-lg tracking-wider">
-          SDU Admin
+        <div className="h-16 flex items-center px-6 border-b border-white/10">
+          <BrandLogo
+            title="SDU Admin"
+            subtitle="校史档案库管理后台"
+            theme="dark"
+            iconClassName="h-9 w-9"
+            titleClassName="text-lg"
+            subtitleClassName="text-xs"
+          />
         </div>
         <nav className="flex-1 py-6 flex flex-col gap-2 px-4">
           <NavLink to="/admin/dashboard" className={navClass}>数据大盘</NavLink>

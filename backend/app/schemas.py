@@ -1,7 +1,7 @@
 import re
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
@@ -144,6 +144,9 @@ class RagCitation(BaseModel):
     source: str
     snippet: str
     document_title: Optional[str] = None
+    filename: Optional[str] = None
+    year_or_period: Optional[str] = None
+    doc_type: Optional[str] = None
 
 
 class RagResponse(BaseModel):
@@ -153,43 +156,143 @@ class RagResponse(BaseModel):
     conversation_id: Optional[uuid.UUID] = None
 
 
-class QuestionCreate(BaseModel):
-    prompt: str
-    options: List[str]
-    correct_index: int
-    points: int = 1
-    question_type: str = "single_choice"
-    explanation: Optional[str] = None
+def _normalize_quiz_text(value: str, field_name: str) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ValueError(f"{field_name}不能为空")
+    return normalized
 
 
-class QuestionUpdate(BaseModel):
+class QuestionBase(BaseModel):
+    collection_id: uuid.UUID
     prompt: str
-    options: List[str]
-    correct_index: int
-    points: int = 1
-    question_type: str = "single_choice"
+    options: List[str] = Field(min_length=2)
+    correct_index: int = Field(ge=0)
+    points: int = Field(default=1, ge=1)
+    question_type: Literal["single_choice"] = "single_choice"
     explanation: Optional[str] = None
+    order_index: int = Field(default=0, ge=0)
+
+    @field_validator('prompt')
+    @classmethod
+    def normalize_prompt(cls, value: str) -> str:
+        return _normalize_quiz_text(value, '题干')
+
+    @field_validator('options')
+    @classmethod
+    def normalize_options(cls, value: List[str]) -> List[str]:
+        normalized = [_normalize_quiz_text(option, '选项') for option in value]
+        if len(normalized) < 2:
+            raise ValueError('至少需要两个选项')
+        return normalized
+
+    @field_validator('explanation')
+    @classmethod
+    def normalize_explanation(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator('correct_index')
+    @classmethod
+    def validate_correct_index(cls, value: int, info) -> int:
+        options = info.data.get('options') or []
+        if options and value >= len(options):
+            raise ValueError('正确答案序号超出范围')
+        return value
+
+
+class QuestionCreate(QuestionBase):
+    pass
+
+
+class QuestionUpdate(QuestionBase):
+    pass
 
 
 class QuestionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    collection_id: uuid.UUID
     prompt: str
     options: List[str]
     points: int
+    order_index: int
+    question_type: Literal["single_choice"] = "single_choice"
     answered: bool = False
 
 
 class QuestionAdminOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    collection_id: Optional[uuid.UUID] = None
     prompt: str
     options: List[str]
     correct_index: int
     question_type: str
     explanation: Optional[str]
     points: int
+    order_index: int
     created_at: datetime
+    updated_at: datetime
+
+
+class QuizCollectionBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+    sort_order: int = Field(default=0, ge=0)
+    is_published: bool = True
+
+    @field_validator('title')
+    @classmethod
+    def normalize_collection_title(cls, value: str) -> str:
+        return _normalize_quiz_text(value, '专题名称')
+
+    @field_validator('description')
+    @classmethod
+    def normalize_collection_description(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class QuizCollectionCreate(QuizCollectionBase):
+    pass
+
+
+class QuizCollectionUpdate(QuizCollectionBase):
+    pass
+
+
+class QuizCollectionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    title: str
+    description: Optional[str] = None
+    sort_order: int
+    is_published: bool
+    question_count: int = 0
+    answered_count: int = 0
+    total_points: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class QuizImportRowIssue(BaseModel):
+    row_number: int
+    prompt: Optional[str] = None
+    error: str
+
+
+class QuizImportResult(BaseModel):
+    collection_id: uuid.UUID
+    collection_title: str
+    total_rows: int
+    created: int
+    skipped: int
+    issues: List[QuizImportRowIssue]
 
 
 class QuestionSubmit(BaseModel):
@@ -197,11 +300,39 @@ class QuestionSubmit(BaseModel):
 
 
 class SubmissionResult(BaseModel):
+    question_id: uuid.UUID
+    collection_id: uuid.UUID
+    selected_index: int
+    selected_option: str
     correct: bool
     awarded: int
     total_points: int
     total_answers: int
+    correct_index: int
+    correct_option: str
     explanation: Optional[str] = None
+
+
+class AnswerHistoryItem(BaseModel):
+    question_id: uuid.UUID
+    prompt: str
+    question_type: Literal["single_choice"] = "single_choice"
+    selected_index: int
+    selected_option: str
+    correct_index: int
+    correct_option: str
+    is_correct: bool
+    points_awarded: int
+    explanation: Optional[str] = None
+    answered_at: datetime
+
+
+class QuizUserSummary(BaseModel):
+    collection_id: Optional[uuid.UUID] = None
+    total_points: int
+    total_answers: int
+    total_questions: int
+    answer_history: List[AnswerHistoryItem]
 
 
 class DashboardKpi(BaseModel):
@@ -229,3 +360,43 @@ class DashboardSummary(BaseModel):
     kpi: DashboardKpi
     wrong_questions: List[WrongQuestionItem]
     top_users: List[TopUserItem]
+
+
+class QuizCollectionStatsItem(BaseModel):
+    collection_id: uuid.UUID
+    title: str
+    is_published: bool
+    question_count: int
+    participant_count: int
+    completed_user_count: int
+    completion_rate: float
+    total_answers: int
+    total_points_awarded: int
+    average_score: float
+    average_accuracy: float
+
+
+class QuizCollectionWrongQuestionItem(BaseModel):
+    question_id: uuid.UUID
+    collection_id: uuid.UUID
+    collection_title: str
+    prompt: str
+    wrong_count: int
+    attempt_count: int
+    accuracy_rate: float
+
+
+class QuizCollectionLeaderboardItem(BaseModel):
+    user_id: uuid.UUID
+    email: EmailStr
+    total_points: int
+    total_answers: int
+    accuracy_rate: float
+
+
+class QuizCollectionDashboard(BaseModel):
+    range_days: Optional[int] = None
+    collection_id: Optional[uuid.UUID] = None
+    collections: List[QuizCollectionStatsItem]
+    wrong_questions: List[QuizCollectionWrongQuestionItem]
+    leaderboard: List[QuizCollectionLeaderboardItem]

@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { apiBase, getAuthToken, clearAuthToken } from '../services/api';
+import InlineNotice from '../components/InlineNotice';
+import { apiBase, clearAuthToken, getAuthHeaders, getAuthToken, parseApiError } from '../services/api';
 
 interface Citation {
   source: string;
   snippet: string;
   document_title?: string;
+  filename?: string;
+  year_or_period?: string;
+  doc_type?: string;
 }
 
 interface ChatMessage {
@@ -16,7 +21,78 @@ interface ChatMessage {
   citations?: Citation[];
   streaming?: boolean;
   error?: string;
+  degraded?: boolean;
 }
+
+type RequestState = 'idle' | 'submitting' | 'streaming' | 'aborted' | 'error';
+
+type Notice = {
+  message: string;
+  type: 'info' | 'success' | 'error';
+};
+
+type StreamPayload = Partial<{
+  citations: Citation[];
+  conversation_id: string;
+  text: string;
+  error: string;
+  done: boolean;
+  degraded: boolean;
+}>;
+
+const HISTORY_WINDOW = 4;
+const DEFAULT_VISIBLE_CITATIONS = 2;
+const QUICK_PROMPTS = [
+  '山东大学是哪一年建校的？',
+  '山东大学历史上有哪些重要校名变更？',
+  '山东大学在抗战时期有哪些办学历程？',
+  '请简要介绍山东大学的历史演变。',
+];
+
+const isAbortError = (error: unknown) => error instanceof Error && error.name === 'AbortError';
+
+const stripExtension = (value: string) => value.replace(/\.[^.]+$/, '');
+
+const normalizeComparableValue = (value?: string) =>
+  stripExtension(value?.split('/').filter(Boolean).pop()?.trim() ?? '')
+    .replace(/[_\-\s]+/g, '')
+    .toLowerCase();
+
+const looksLikeFileName = (value?: string) => {
+  if (!value) return false;
+  const trimmed = value.trim();
+  return /[\\/]/.test(trimmed) || /\.[a-z0-9]{1,6}$/i.test(trimmed);
+};
+
+const looksLikeOpaqueObjectName = (value?: string) => {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f-]{20,}/i.test(value.trim());
+};
+
+const hasReadableDocumentTitle = (citation: Citation) => {
+  const title = citation.document_title?.trim();
+  if (!title) return false;
+  if (looksLikeFileName(title) || looksLikeOpaqueObjectName(title)) return false;
+
+  const comparableTitle = normalizeComparableValue(title);
+  if (!comparableTitle) return false;
+
+  return comparableTitle !== normalizeComparableValue(citation.filename)
+    && comparableTitle !== normalizeComparableValue(citation.source);
+};
+
+const getCitationTitle = (citation: Citation, index: number) => {
+  if (hasReadableDocumentTitle(citation)) {
+    return citation.document_title!.trim();
+  }
+  return `档案依据 ${index + 1}`;
+};
+
+const buildCitationCopyText = (citation: Citation, index: number) => {
+  const lines = [`参考依据 ${index + 1}：${getCitationTitle(citation, index)}`, `片段摘要：${citation.snippet}`];
+
+  return lines.join('\n');
+};
 
 function MarkdownMessage({ content }: { content: string }) {
   return (
@@ -45,18 +121,156 @@ function MarkdownMessage({ content }: { content: string }) {
   );
 }
 
+function CitationCard({ citation, index }: { citation: Citation; index: number }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(buildCitationCopyText(citation, index));
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <li className="rounded-2xl border border-ink-dark/10 bg-paper-bg/70 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sdu-red/10 text-xs font-semibold text-sdu-red">
+            {index + 1}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-ink-dark">{getCitationTitle(citation, index)}</p>
+          <p className={`mt-1.5 text-sm leading-6 text-ink-light ${expanded ? '' : 'line-clamp-2'}`}>
+              {citation.snippet}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink-dark/10 pt-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setExpanded((current) => !current)}
+            className="rounded-full border border-ink-dark/10 px-3 py-1 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+          >
+            {expanded ? '收起摘要' : '展开摘要'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCopy()}
+            className="rounded-full border border-ink-dark/10 px-3 py-1 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+          >
+            {copied ? '已复制' : '复制摘录'}
+          </button>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function CitationList({ citations, degraded }: { citations: Citation[]; degraded?: boolean }) {
+  const [showAll, setShowAll] = useState(false);
+
+  if (!citations.length && !degraded) return null;
+
+  const visibleCitations = showAll ? citations : citations.slice(0, DEFAULT_VISIBLE_CITATIONS);
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-ink-dark/10 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-ink-light">参考依据</p>
+        {citations.length > 0 ? <p className="text-xs text-ink-light">共 {citations.length} 条</p> : null}
+      </div>
+
+      {degraded && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          当前回答基于检索片段整理，建议结合原始档案进一步核对。
+        </p>
+      )}
+
+      {citations.length > 0 ? (
+        <>
+          <ul className="space-y-2.5">
+            {visibleCitations.map((citation, index) => (
+              <CitationCard key={`${citation.source}-${index}`} citation={citation} index={index} />
+            ))}
+          </ul>
+
+          {citations.length > DEFAULT_VISIBLE_CITATIONS && (
+            <button
+              type="button"
+              onClick={() => setShowAll((current) => !current)}
+              className="inline-flex items-center rounded-full border border-ink-dark/10 px-3 py-1.5 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+            >
+              {showAll ? '收起其余依据' : `查看更多依据（+${citations.length - DEFAULT_VISIBLE_CITATIONS}）`}
+            </button>
+          )}
+        </>
+      ) : (
+        <p className="text-xs leading-5 text-ink-light">当前回答未返回可展示的引用摘录。</p>
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`w-full max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[82%] ${
+          isUser
+            ? 'bg-sdu-red text-white shadow-sm'
+            : 'border border-ink-dark/10 bg-white text-ink-dark shadow-sm'
+        }`}
+      >
+        <div className={`mb-2 flex items-center justify-between gap-3 text-xs font-medium ${isUser ? 'text-white/80' : 'text-ink-light'}`}>
+          <p>{isUser ? '你' : 'AI 回答'}</p>
+          {!isUser && message.streaming ? <p className="text-sdu-red">正在生成…</p> : null}
+        </div>
+
+        {isUser ? (
+          <p className="whitespace-pre-wrap leading-7">{message.content}</p>
+        ) : (
+          <>
+            <MarkdownMessage content={message.content || (message.streaming ? '正在生成回答...' : '暂无内容')} />
+            {message.streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse rounded bg-sdu-red/60 align-text-bottom" />}
+            {message.degraded && (
+              <p className="mt-3 text-xs leading-5 text-amber-700">当前回答基于检索片段整理，仅供参考。</p>
+            )}
+            {message.error && <p className="mt-3 text-sm text-sdu-red">{message.error}</p>}
+            <CitationList citations={message.citations ?? []} degraded={message.degraded} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
-  const HISTORY_WINDOW = 4;
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [token, setToken] = useState<string | null>(null);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [status, setStatus] = useState('');
-  const [streaming, setStreaming] = useState(false);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [requestState, setRequestState] = useState<RequestState>('idle');
+  const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const navigate = useNavigate();
+
+  const isBusy = requestState === 'submitting' || requestState === 'streaming';
+  const canRetry = Boolean(token && lastSubmittedQuery && !isBusy);
+
+  const pageSummary = useMemo(() => {
+    if (!token) return '登录后即可按自然语言提问，并查看回答对应的档案摘录。';
+    if (!messages.length) return '可以直接输入问题，系统会返回精简回答与相关档案摘录。';
+    return activeConversationId ? '当前正在同一轮对话中连续追问。' : '已准备好开始新的对话。';
+  }, [activeConversationId, messages.length, token]);
 
   useEffect(() => {
     setToken(getAuthToken());
@@ -64,91 +278,108 @@ export default function Home() {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, streaming]);
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatus('登录中...');
-
-    try {
-      const form = new FormData();
-      form.append('username', email);
-      form.append('password', password);
-
-      const loginRes = await fetch(`${apiBase}/api/auth/login`, {
-        method: 'POST',
-        body: form,
-      });
-      if (!loginRes.ok) {
-        const err = await loginRes.json().catch(() => ({}));
-        throw new Error(err.detail || '登录失败');
-      }
-
-      const data = await loginRes.json();
-      localStorage.setItem('token', data.access_token);
-      setToken(data.access_token);
-      setStatus('登录成功，现在可以检索了');
-      setEmail('');
-      setPassword('');
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : '认证失败');
-    }
-  };
+  }, [isBusy, messages]);
 
   const handleLogout = () => {
+    abortRef.current?.abort();
     clearAuthToken();
     setToken(null);
     setActiveConversationId(null);
     setMessages([]);
-    setStatus('已退出登录');
+    setLastSubmittedQuery('');
+    setRequestState('idle');
+    setNotice({ message: '已退出登录。', type: 'info' });
   };
 
   const handleNewConversation = () => {
+    abortRef.current?.abort();
     setActiveConversationId(null);
     setQuery('');
     setMessages([]);
-    setStatus('已切换到新对话');
+    setRequestState('idle');
+    setNotice({ message: '已切换到新对话。', type: 'info' });
   };
 
-  // ─── SSE streaming search ───────────────────────────────────────────
-  const handleSearch = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    const userQuery = query.trim();
+  const handleAbort = useCallback(() => {
+    if (!abortRef.current) return;
+    abortRef.current.abort();
+    setRequestState('aborted');
+    setNotice({ message: '已停止生成，可继续追问或重试上一问。', type: 'info' });
+  }, []);
+
+  const submitQuery = useCallback(async (rawQuery: string, options?: { clearInput?: boolean }) => {
+    const userQuery = rawQuery.trim();
     if (!userQuery || !token) {
-      if (!token) setStatus('请先登录后再进行校史检索');
+      if (!token) {
+        setNotice({ message: '请先登录后再进行校史问答。', type: 'info' });
+        navigate('/login?next=/', { replace: false });
+      }
       return;
     }
 
-    // Abort any in-flight request
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    const userMessageId = `${Date.now()}-user`;
-    const assistantMessageId = `${Date.now()}-assistant`;
+    const stamp = Date.now();
+    const userMessageId = `${stamp}-user`;
+    const assistantMessageId = `${stamp}-assistant`;
 
     setMessages((prev) => [
       ...prev,
       { id: userMessageId, role: 'user', content: userQuery },
       { id: assistantMessageId, role: 'assistant', content: '', citations: [], streaming: true },
     ]);
-    setQuery('');
+    if (options?.clearInput) {
+      setQuery('');
+    }
+    setLastSubmittedQuery(userQuery);
+    setRequestState('submitting');
+    setNotice({ message: '正在检索相关档案并生成回答…', type: 'info' });
 
-    setStatus('检索中...');
-    setStreaming(true);
-    const updateAssistant = (updater: (msg: ChatMessage) => ChatMessage) => {
-      setMessages((prev) =>
-        prev.map((msg) => (msg.id === assistantMessageId ? updater(msg) : msg)),
-      );
+    const updateAssistant = (updater: (message: ChatMessage) => ChatMessage) => {
+      setMessages((prev) => prev.map((message) => (message.id === assistantMessageId ? updater(message) : message)));
+    };
+
+    const applyPayload = (payload: StreamPayload) => {
+      if (payload.citations) {
+        updateAssistant((message) => ({ ...message, citations: payload.citations }));
+      }
+      if (payload.conversation_id) {
+        setActiveConversationId(payload.conversation_id);
+      }
+      if (payload.text) {
+        setRequestState('streaming');
+        updateAssistant((message) => ({ ...message, content: message.content + payload.text }));
+      }
+      if (payload.degraded) {
+        updateAssistant((message) => ({ ...message, degraded: true }));
+        setNotice({ message: '当前回答基于检索片段整理。', type: 'info' });
+      }
+      if (payload.error) {
+        setRequestState('error');
+        setNotice({ message: payload.error, type: 'error' });
+        updateAssistant((message) => ({ ...message, error: payload.error, streaming: false }));
+      }
+      if (payload.done) {
+        updateAssistant((message) => ({ ...message, streaming: false }));
+        setRequestState((current) => (current === 'error' ? current : 'idle'));
+      }
+    };
+
+    const processLine = (line: string) => {
+      if (!line.startsWith('data: ')) return;
+      try {
+        applyPayload(JSON.parse(line.slice(6)) as StreamPayload);
+      } catch {
+        // 忽略格式不正确的 SSE 行
+      }
     };
 
     try {
       const res = await fetch(`${apiBase}/api/rag/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({
           query: userQuery,
           conversation_id: activeConversationId,
@@ -157,223 +388,230 @@ export default function Home() {
         signal: controller.signal,
       });
 
-      if (res.status === 401) {
-        clearAuthToken();
-        setToken(null);
-        throw new Error('登录已过期，请重新登录');
+      if (!res.ok) {
+        throw new Error(await parseApiError(res, '查询失败，请稍后重试', { redirectOn401To: '/login?next=/' }));
       }
-      if (!res.ok) throw new Error('查询失败');
 
       const reader = res.body?.getReader();
-      if (!reader) throw new Error('浏览器不支持流式读取');
+      if (!reader) {
+        throw new Error('浏览器不支持流式读取');
+      }
+
+      setRequestState('streaming');
+      setNotice(null);
 
       const decoder = new TextDecoder();
-      let buf = '';
-
-      setStatus('');
+      let buffer = '';
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() || '';
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        lines.forEach(processLine);
+      }
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            const payload = JSON.parse(line.slice(6));
-            if (payload.citations) {
-              updateAssistant((msg) => ({ ...msg, citations: payload.citations }));
-            }
-            if (payload.conversation_id) {
-              setActiveConversationId(payload.conversation_id);
-            }
-            if (payload.text) {
-              updateAssistant((msg) => ({ ...msg, content: msg.content + payload.text }));
-            }
-            if (payload.error) {
-              setStatus(payload.error);
-              updateAssistant((msg) => ({ ...msg, error: payload.error, streaming: false }));
-            }
-            if (payload.done) {
-              updateAssistant((msg) => ({ ...msg, streaming: false }));
-            }
-          } catch {
-            // ignore malformed SSE lines
-          }
-        }
+      if (buffer.trim()) {
+        processLine(buffer.trim());
       }
     } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        const errorMessage = err instanceof Error ? err.message : '查询失败，请稍后重试';
-        setStatus(errorMessage);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId ? { ...msg, error: errorMessage, streaming: false } : msg,
-          ),
-        );
+      if (isAbortError(err)) {
+        updateAssistant((message) => ({
+          ...message,
+          streaming: false,
+          content: message.content || '已停止本次生成。',
+        }));
+        return;
       }
+
+      const errorMessage = err instanceof Error ? err.message : '查询失败，请稍后重试';
+      setRequestState('error');
+      setNotice({ message: errorMessage, type: 'error' });
+      updateAssistant((message) => ({
+        ...message,
+        error: errorMessage,
+        streaming: false,
+        content: message.content || '抱歉，本次回答未能成功生成。',
+      }));
     } finally {
-      setStreaming(false);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId ? { ...msg, streaming: false } : msg,
-        ),
-      );
+      setMessages((prev) => prev.map((message) => (message.id === assistantMessageId ? { ...message, streaming: false } : message)));
+      setRequestState((current) => (current === 'submitting' || current === 'streaming' ? 'idle' : current));
       abortRef.current = null;
     }
-  }, [activeConversationId, query, token]);
+  }, [activeConversationId, navigate, token]);
+
+  const handleSearch = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitQuery(query, { clearInput: true });
+  }, [query, submitQuery]);
+
+  const handleRetryLast = useCallback(async () => {
+    if (!lastSubmittedQuery || isBusy) return;
+    await submitQuery(lastSubmittedQuery);
+  }, [isBusy, lastSubmittedQuery, submitQuery]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (!isBusy && query.trim()) {
+        void submitQuery(query, { clearInput: true });
+      }
+    }
+  };
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <section className="mb-8 rounded-3xl border border-ink-dark/10 bg-white/90 px-6 py-8 shadow-sm md:px-10">
-        <h1 className="text-3xl md:text-4xl font-serif font-bold text-ink-dark tracking-tight">山大校史 AI 问答</h1>
-        <p className="mt-3 max-w-2xl text-ink-light leading-relaxed">
-          通过自然语言提问，系统将基于校史档案进行检索并生成回答，同时给出可追溯的引用文献。
-        </p>
-
-        {!token ? (
-          <div className="mt-8 rounded-2xl border border-ink-dark/10 bg-paper-bg p-5 md:p-6">
-            <h2 className="text-lg font-serif font-bold text-ink-dark">登录后开始问答</h2>
-            <p className="mt-1 text-sm text-ink-light">为保障档案服务安全，问答功能仅对已登录用户开放。</p>
-            <form onSubmit={handleAuth} className="mt-5 grid gap-4 md:grid-cols-2">
-              <label className="text-sm text-ink-dark">
-                邮箱
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-ink-dark/20 bg-white px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-sdu-red/30"
-                  placeholder="you@sdu.edu.cn"
-                  required
-                />
-              </label>
-              <label className="text-sm text-ink-dark">
-                密码
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-ink-dark/20 bg-white px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-sdu-red/30"
-                  required
-                />
-              </label>
-              <div className="md:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-ink-light">账号由管理员创建，如需开通请联系管理员。</p>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-sdu-red px-5 py-2.5 text-sm font-medium text-white hover:bg-sdu-red-hover transition-colors"
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <section className="overflow-hidden rounded-3xl border border-ink-dark/10 bg-white/95 shadow-sm">
+        <div className="bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.08),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] px-6 py-7 md:px-8">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-3xl">
+              <h1 className="text-3xl font-serif font-bold tracking-tight text-ink-dark md:text-4xl">AI 校史问答</h1>
+              <p className="mt-3 text-sm leading-6 text-ink-light md:text-base">{pageSummary}</p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              {token ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleNewConversation}
+                    disabled={isBusy}
+                    className="rounded-xl border border-ink-dark/15 px-4 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    新对话
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="rounded-xl border border-ink-dark/15 px-4 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red"
+                  >
+                    退出登录
+                  </button>
+                </>
+              ) : (
+                <Link
+                  to="/login?next=/"
+                  className="rounded-xl bg-sdu-red px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover"
                 >
-                  登录并开始检索
-                </button>
-              </div>
-            </form>
-          </div>
-        ) : (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-light">
-            <span>已登录，可进行多轮提问。</span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleNewConversation}
-                disabled={streaming}
-                className="rounded-md border border-ink-dark/20 px-3 py-1.5 text-ink-dark hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                新对话
-              </button>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-md border border-ink-dark/20 px-3 py-1.5 text-ink-dark hover:border-sdu-red hover:text-sdu-red"
-              >
-                退出登录
-              </button>
+                  登录后提问
+                </Link>
+              )}
             </div>
           </div>
-        )}
+
+          {notice ? <InlineNotice message={notice.message} type={notice.type} className="mt-5" /> : null}
+
+          <form onSubmit={handleSearch} className="mt-5 space-y-4">
+            <textarea
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="例如：山东大学的历史演变是怎样的？"
+              className="min-h-[120px] w-full rounded-2xl border border-ink-dark/15 bg-white px-4 py-3 text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+              disabled={!token || isBusy}
+            />
+
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setQuery(prompt)}
+                    className="rounded-full border border-ink-dark/10 bg-white px-3.5 py-2 text-sm text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleRetryLast}
+                  disabled={!canRetry}
+                  className="rounded-xl border border-ink-dark/15 px-4 py-3 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  重试上一问
+                </button>
+                {isBusy ? (
+                  <button
+                    type="button"
+                    onClick={handleAbort}
+                    className="rounded-xl border border-sdu-red/30 bg-sdu-red/5 px-4 py-3 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10"
+                  >
+                    停止生成
+                  </button>
+                ) : null}
+                <button
+                  type="submit"
+                  disabled={!token || !query.trim() || isBusy}
+                  className="rounded-xl bg-sdu-red px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isBusy ? '生成中…' : '发送问题'}
+                </button>
+              </div>
+            </div>
+
+            {!token ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-ink-dark/10 bg-paper-bg/70 px-4 py-4 text-sm text-ink-light md:flex-row md:items-center md:justify-between">
+                <p>问答功能仅对已登录用户开放，登录后即可查看回答与对应档案摘录。</p>
+                <Link to="/login?next=/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
+                  前往登录
+                </Link>
+              </div>
+            ) : (
+              <p className="text-sm text-ink-light">按 Enter 发送，Shift + Enter 换行。</p>
+            )}
+          </form>
+        </div>
       </section>
 
-      <section className="rounded-3xl border border-ink-dark/10 bg-white shadow-sm overflow-hidden">
+      <section className="overflow-hidden rounded-3xl border border-ink-dark/10 bg-white shadow-sm">
         <div className="border-b border-ink-dark/10 px-5 py-4 md:px-6">
-          <h3 className="font-serif text-xl font-bold text-ink-dark">当前对话</h3>
-          <p className="mt-1 text-sm text-ink-light">支持连续追问，回答将以 Markdown 格式展示。</p>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-serif text-xl font-bold text-ink-dark">对话记录</h2>
+              <p className="mt-1 text-sm text-ink-light">回答将尽量附带可直接查看的档案摘录。</p>
+            </div>
+            <p className="text-sm text-ink-light">
+              {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '登录后开始提问'}
+            </p>
+          </div>
         </div>
 
         <div className="max-h-[62vh] overflow-y-auto bg-paper-bg/60 px-4 py-5 md:px-6">
           {messages.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-ink-dark/20 bg-white/70 p-6 text-center text-sm text-ink-light">
-              暂无对话，试试输入：山东大学是哪一年建校的？
+            <div className="rounded-2xl border border-dashed border-ink-dark/20 bg-white/80 p-8 text-center shadow-sm">
+              <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '登录后即可开始问答'}</p>
+              <p className="mt-2 text-sm leading-6 text-ink-light">
+                {token ? '可以直接提问校名变更、历史沿革、办学历程等问题。' : '登录后可使用流式问答，并查看回答对应的档案摘录。'}
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {token ? QUICK_PROMPTS.slice(0, 3).map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => setQuery(prompt)}
+                    className="rounded-full border border-ink-dark/10 bg-paper-bg px-3 py-1.5 text-sm text-ink-dark hover:border-sdu-red/30 hover:text-sdu-red"
+                  >
+                    {prompt}
+                  </button>
+                )) : (
+                  <Link to="/login?next=/" className="rounded-full border border-sdu-red/20 bg-sdu-red/5 px-4 py-2 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10">
+                    去登录
+                  </Link>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`w-full max-w-[90%] rounded-2xl px-4 py-3 md:max-w-[82%] ${
-                      message.role === 'user'
-                        ? 'bg-sdu-red text-white shadow-sm'
-                        : 'bg-white border border-ink-dark/10 text-ink-dark shadow-sm'
-                    }`}
-                  >
-                    <p className={`mb-2 text-xs font-medium ${message.role === 'user' ? 'text-white/80' : 'text-ink-light'}`}>
-                      {message.role === 'user' ? '你' : 'AI 助手'}
-                    </p>
-
-                    {message.role === 'assistant' ? (
-                      <>
-                        <MarkdownMessage content={message.content || (message.streaming ? '正在生成回答...' : '')} />
-                        {message.streaming && (
-                          <span className="ml-0.5 inline-block h-4 w-2 animate-pulse align-text-bottom bg-sdu-red/60" />
-                        )}
-                        {message.error && <p className="mt-3 text-sm text-sdu-red">{message.error}</p>}
-
-                        {message.citations && message.citations.length > 0 && (
-                          <div className="mt-4 border-t border-ink-dark/10 pt-3">
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-light">引用文献</p>
-                            <ul className="space-y-2">
-                              {message.citations.map((cit, idx) => (
-                                <li key={`${message.id}-cit-${idx}`} className="rounded-lg border border-ink-dark/10 bg-paper-bg px-3 py-2">
-                                  <p className="text-sm font-medium text-sdu-red">[{idx + 1}] {cit.document_title || cit.source}</p>
-                                  <p className="mt-0.5 line-clamp-3 text-xs text-ink-light">{cit.snippet}</p>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+              {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
               <div ref={chatEndRef} />
             </div>
           )}
         </div>
-
-        <form onSubmit={handleSearch} className="border-t border-ink-dark/10 bg-white px-4 py-4 md:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="例如：山东大学的历史演变是怎样的？"
-              className="flex-1 rounded-xl border border-ink-dark/20 bg-white px-4 py-3 text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100"
-              disabled={!token || streaming}
-            />
-            <button
-              type="submit"
-              disabled={!token || !query.trim() || streaming}
-              className="rounded-xl bg-sdu-red px-6 py-3 font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {streaming ? '生成中…' : '发送问题'}
-            </button>
-          </div>
-          {status && <p className="mt-2 text-sm text-sdu-red">{status}</p>}
-        </form>
       </section>
     </div>
   );

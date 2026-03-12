@@ -46,7 +46,14 @@ def _build_context_and_citations(results):
         title = doc.title if doc else chunk.source_url
         snippet = chunk.content[:200]
         citations.append(
-            RagCitation(source=chunk.source_url, snippet=snippet, document_title=title)
+            RagCitation(
+                source=chunk.source_url,
+                snippet=snippet,
+                document_title=title,
+                filename=doc.filename if doc else None,
+                year_or_period=doc.year_or_period if doc else None,
+                doc_type=doc.doc_type if doc else None,
+            )
         )
         context_parts.append(f"[来源{idx}] {chunk.content}")
     context = "\n\n".join(context_parts)

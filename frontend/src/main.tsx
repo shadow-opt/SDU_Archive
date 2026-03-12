@@ -6,7 +6,10 @@ import './index.css'
 import PublicLayout from './components/PublicLayout'
 import AdminLayout from './components/AdminLayout'
 import Home from './pages/Home'
-import Quiz from './pages/Quiz'
+import UserLogin from './pages/UserLogin'
+import QuizTopics from './pages/QuizTopics'
+import QuizPlay from './pages/QuizPlay'
+import QuizResults from './pages/QuizResults'
 import AdminLogin from './pages/AdminLogin'
 import Upload from './pages/Upload'
 import RagChunks from './pages/RagChunks'
@@ -32,7 +35,10 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<Home />} />
-          <Route path="quiz" element={<Quiz />} />
+          <Route path="login" element={<UserLogin />} />
+          <Route path="quiz" element={<QuizTopics />} />
+          <Route path="quiz/:collectionId" element={<QuizPlay />} />
+          <Route path="quiz/:collectionId/result" element={<QuizResults />} />
         </Route>
         
         <Route path="/admin/login" element={<AdminLogin />} />

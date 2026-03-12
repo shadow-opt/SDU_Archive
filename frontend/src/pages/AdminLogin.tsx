@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiBase, parseApiError } from '../services/api';
+import BrandLogo from '../components/BrandLogo';
 import InlineNotice from '../components/InlineNotice';
 
 export default function AdminLogin() {
@@ -61,8 +62,14 @@ export default function AdminLogin() {
     <div className="min-h-screen flex items-center justify-center bg-paper-bg">
       <div className="w-full max-w-md p-8 bg-white rounded-2xl shadow-xl border border-ink-dark/5">
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-serif font-bold text-sdu-red mb-2">SDU Admin</h1>
-          <p className="text-ink-light">校史档案库管理后台</p>
+          <BrandLogo
+            title="SDU Admin"
+            subtitle="校史档案库管理后台"
+            stacked
+            className="justify-center"
+            iconClassName="h-16 w-16"
+            titleClassName="text-3xl"
+          />
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">

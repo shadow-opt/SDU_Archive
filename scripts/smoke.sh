@@ -155,10 +155,27 @@ curl -fsS -X PATCH "${API_URL}/api/admin/users/${test_user_id}/status" \
   -d '{"is_active":false}' >/dev/null
 
 echo "[12/12] admin quiz create + delete"
+collection_json=$(curl -fsS -X POST "${API_URL}/api/quiz/collections" \
+  -H "Authorization: Bearer ${token}" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"[smoke] 互动答题专题","description":"smoke test collection","sort_order":999,"is_published":true}')
+
+collection_id=$(python3 - <<'PY' "$collection_json"
+import json,sys
+obj=json.loads(sys.argv[1])
+print(obj.get('id',''))
+PY
+)
+
+if [[ -z "${collection_id}" ]]; then
+  echo "ERROR: quiz collection create did not return id" >&2
+  exit 1
+fi
+
 create_json=$(curl -fsS -X POST "${API_URL}/api/quiz/questions" \
   -H "Authorization: Bearer ${token}" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"[smoke] 山东大学校史测试题","options":["A","B"],"correct_index":0,"points":1}')
+  -d '{"collection_id":"'"${collection_id}"'","prompt":"[smoke] 山东大学校史测试题","options":["A","B"],"correct_index":0,"points":1}')
 
 question_id=$(python3 - <<'PY' "$create_json"
 import json,sys
@@ -185,6 +202,9 @@ fi
 
 
 curl -fsS -X DELETE "${API_URL}/api/quiz/questions/${question_id}" \
+  -H "Authorization: Bearer ${token}" >/dev/null
+
+curl -fsS -X DELETE "${API_URL}/api/quiz/collections/${collection_id}" \
   -H "Authorization: Bearer ${token}" >/dev/null
 
 rag_auth_code=$(curl -s -o /tmp/sdu_rag_query.out -w "%{http_code}" -X POST "${API_URL}/api/rag/query" \
