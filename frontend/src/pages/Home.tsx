@@ -360,7 +360,7 @@ export default function Home() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="例如：山东大学校训的历史演变是什么？"
+              placeholder="例如：山东大学的历史演变是怎样的？"
               className="flex-1 rounded-xl border border-ink-dark/20 bg-white px-4 py-3 text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100"
               disabled={!token || streaming}
             />
