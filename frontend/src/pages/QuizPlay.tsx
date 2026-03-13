@@ -190,7 +190,7 @@ export default function QuizPlay() {
             <h2 className="text-xl font-serif font-bold">题目导航</h2>
             <span className="text-xs text-ink-light">共 {questions.length} 题</span>
           </div>
-          <div className="space-y-3 max-h-[620px] overflow-y-auto pr-1">
+          <div className="space-y-3 max-h-none overflow-visible pr-0 xl:max-h-[620px] xl:overflow-y-auto xl:pr-1">
             {questions.map((question) => {
               const answered = historyMap.has(question.id);
               const active = question.id === selectedQuestionId;
@@ -221,7 +221,7 @@ export default function QuizPlay() {
           </div>
         </aside>
 
-        <section className="bg-white border border-ink-dark/10 rounded-2xl p-6 md:p-8">
+        <section className="bg-white border border-ink-dark/10 rounded-2xl p-5 md:p-8">
           <form onSubmit={onSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-ink-dark mb-2">当前题目</label>

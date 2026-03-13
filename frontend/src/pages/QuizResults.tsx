@@ -144,7 +144,7 @@ export default function QuizResults() {
       )}
       {loading && <p className="text-sm text-ink-light">加载中...</p>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-white border border-ink-dark/10 rounded-2xl p-5">
           <p className="text-sm text-ink-light mb-2">累计积分</p>
           <p className="text-3xl font-bold text-sdu-red">{summary?.total_points ?? 0}</p>
@@ -164,7 +164,7 @@ export default function QuizResults() {
       </div>
 
       <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,0.8fr)] gap-6">
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-6">
+        <div className="bg-white border border-ink-dark/10 rounded-2xl p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="text-xl font-serif font-bold">作答历史</h2>
             <span className="text-xs text-ink-light">{summary?.answer_history.length ?? 0} 条记录</span>
@@ -196,7 +196,7 @@ export default function QuizResults() {
           )}
         </div>
 
-        <aside className="bg-white border border-ink-dark/10 rounded-2xl p-6 h-fit">
+        <aside className="bg-white border border-ink-dark/10 rounded-2xl p-5 sm:p-6 h-fit">
           <h2 className="text-xl font-serif font-bold mb-4">专题概览</h2>
           <div className="space-y-4 text-sm">
             <div className="rounded-xl bg-paper-bg/50 px-4 py-4">

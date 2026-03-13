@@ -66,7 +66,7 @@ export default function QuizTopics() {
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-ink-dark mb-3">互动答题</h1>
             <p className="text-ink-light max-w-2xl">选择专题开始作答！</p>
           </div>
-          <div className="grid grid-cols-3 gap-3 min-w-full md:min-w-0 md:w-auto">
+          <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 md:min-w-0 md:w-auto">
             <div className="rounded-2xl border border-ink-dark/10 px-4 py-3 bg-paper-bg/40">
               <p className="text-xs text-ink-light mb-1">专题数</p>
               <p className="text-2xl font-bold text-sdu-red">{collections.length}</p>
@@ -124,7 +124,7 @@ export default function QuizTopics() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                   <div className="rounded-xl bg-paper-bg/50 px-3 py-3">
                     <p className="text-ink-light mb-1">题目</p>
                     <p className="font-semibold text-ink-dark">{collection.question_count}</p>

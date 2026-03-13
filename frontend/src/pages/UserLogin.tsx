@@ -54,7 +54,7 @@ export default function UserLogin() {
   };
 
   return (
-    <div className="mx-auto flex min-h-[72vh] max-w-5xl items-center justify-center px-4 py-8">
+    <div className="mx-auto flex min-h-screen w-full max-w-5xl items-start justify-center px-4 py-6 sm:min-h-[72vh] sm:items-center sm:py-8">
       <div className="grid w-full max-w-4xl gap-6 rounded-[28px] border border-ink-dark/10 bg-white p-6 shadow-xl md:grid-cols-[1.05fr_0.95fr] md:p-8">
         <div className="rounded-3xl bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.12),transparent_42%),linear-gradient(180deg,rgba(255,248,248,0.95),rgba(255,255,255,0.98))] p-6 md:p-8 flex h-full flex-col">
           <BrandLogo

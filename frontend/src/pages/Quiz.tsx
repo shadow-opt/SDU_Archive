@@ -203,7 +203,7 @@ export default function Quiz() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="bg-white border border-ink-dark/10 rounded-2xl p-6">
+      <div className="bg-white border border-ink-dark/10 rounded-2xl p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div>
             <h2 className="text-2xl font-serif font-bold mb-2">互动题库</h2>
@@ -238,7 +238,7 @@ export default function Quiz() {
                   </div>
                   <span className="text-xs rounded-full px-2.5 py-1 bg-sdu-red/10 text-sdu-red">{progress}%</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                   <div>
                     <p className="text-ink-light">题目</p>
                     <p className="font-semibold">{collection.question_count}</p>
@@ -281,7 +281,7 @@ export default function Quiz() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,1fr)] gap-6">
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-8">
+        <div className="bg-white border border-ink-dark/10 rounded-2xl p-5 md:p-8">
       <h2 className="text-2xl font-serif font-bold mb-2">{selectedCollection?.title ?? '请选择专题'}</h2>
       <p className="text-ink-light mb-6">
         {selectedCollection?.description ?? '登录用户可参与答题并累计积分，已答题支持回看正确答案与解析。'}
@@ -412,7 +412,7 @@ export default function Quiz() {
           )}
 
           {!!summary?.answer_history.length && (
-            <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1">
+            <div className="space-y-3 max-h-none overflow-visible pr-0 xl:max-h-[640px] xl:overflow-y-auto xl:pr-1">
               {summary.answer_history.map((item) => (
                 <button
                   key={item.question_id}

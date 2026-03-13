@@ -19,3 +19,11 @@
     @apply bg-sdu-red/20 text-ink-dark;
   }
 }
+
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

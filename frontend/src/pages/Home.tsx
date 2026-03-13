@@ -96,7 +96,7 @@ const buildCitationCopyText = (citation: Citation, index: number) => {
 
 function MarkdownMessage({ content }: { content: string }) {
   return (
-    <div className="prose prose-stone max-w-none prose-headings:font-serif prose-headings:text-ink-dark prose-p:text-ink-dark prose-strong:text-ink-dark prose-li:text-ink-dark prose-code:text-ink-dark prose-pre:bg-ink-dark prose-pre:text-white">
+    <div className="prose prose-stone max-w-none break-words prose-headings:font-serif prose-headings:text-ink-dark prose-p:text-ink-dark prose-strong:text-ink-dark prose-li:text-ink-dark prose-code:text-ink-dark prose-pre:overflow-x-auto prose-pre:bg-ink-dark prose-pre:text-white">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -154,14 +154,14 @@ function CitationCard({ citation, index }: { citation: Citation; index: number }
           <button
             type="button"
             onClick={() => setExpanded((current) => !current)}
-            className="rounded-full border border-ink-dark/10 px-3 py-1 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+            className="rounded-full border border-ink-dark/10 px-3.5 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:px-3 sm:py-1 sm:text-xs"
           >
             {expanded ? '收起摘要' : '展开摘要'}
           </button>
           <button
             type="button"
             onClick={() => void handleCopy()}
-            className="rounded-full border border-ink-dark/10 px-3 py-1 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+            className="rounded-full border border-ink-dark/10 px-3.5 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:px-3 sm:py-1 sm:text-xs"
           >
             {copied ? '已复制' : '复制摘录'}
           </button>
@@ -453,6 +453,10 @@ export default function Home() {
   }, [isBusy, lastSubmittedQuery, submitQuery]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isMobileViewport = window.matchMedia('(max-width: 767px)').matches;
+    if (isMobileViewport) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (!isBusy && query.trim()) {
@@ -562,7 +566,7 @@ export default function Home() {
                 </Link>
               </div>
             ) : (
-              <p className="text-sm text-ink-light">按 Enter 发送，Shift + Enter 换行。</p>
+              <p className="text-sm text-ink-light">桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。</p>
             )}
           </form>
         </div>
@@ -581,7 +585,7 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="max-h-[62vh] overflow-y-auto bg-paper-bg/60 px-4 py-5 md:px-6">
+        <div className="max-h-none overflow-visible bg-paper-bg/60 px-4 py-5 md:max-h-[62vh] md:overflow-y-auto md:px-6">
           {messages.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-ink-dark/20 bg-white/80 p-8 text-center shadow-sm">
               <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '登录后即可开始问答'}</p>
