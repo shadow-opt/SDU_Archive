@@ -164,7 +164,6 @@ def _normalize_quiz_text(value: str, field_name: str) -> str:
 
 
 class QuestionBase(BaseModel):
-    collection_id: uuid.UUID
     prompt: str
     options: List[str] = Field(min_length=2)
     correct_index: int = Field(ge=0)
@@ -204,11 +203,11 @@ class QuestionBase(BaseModel):
 
 
 class QuestionCreate(QuestionBase):
-    pass
+    collection_id: Optional[uuid.UUID] = None
 
 
 class QuestionUpdate(QuestionBase):
-    pass
+    collection_id: uuid.UUID
 
 
 class QuestionOut(BaseModel):
@@ -296,7 +295,7 @@ class QuizImportResult(BaseModel):
 
 
 class QuestionSubmit(BaseModel):
-    answer_index: int
+    answer_index: int = Field(ge=0)
 
 
 class SubmissionResult(BaseModel):

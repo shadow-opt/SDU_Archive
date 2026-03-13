@@ -267,9 +267,9 @@ export default function Home() {
   const canRetry = Boolean(token && lastSubmittedQuery && !isBusy);
 
   const pageSummary = useMemo(() => {
-    if (!token) return '登录后即可按自然语言提问，并查看回答对应的档案摘录。';
-    if (!messages.length) return '可以直接输入问题，系统会返回精简回答与相关档案摘录。';
-    return activeConversationId ? '当前正在同一轮对话中连续追问。' : '已准备好开始新的对话。';
+    if (!token) return '登录后即可提问。';
+    if (!messages.length) return '输入问题后即可开始。';
+    return activeConversationId ? '当前对话进行中。' : '已准备好开始新对话。';
   }, [activeConversationId, messages.length, token]);
 
   useEffect(() => {
@@ -556,7 +556,7 @@ export default function Home() {
 
             {!token ? (
               <div className="flex flex-col gap-3 rounded-2xl border border-ink-dark/10 bg-paper-bg/70 px-4 py-4 text-sm text-ink-light md:flex-row md:items-center md:justify-between">
-                <p>问答功能仅对已登录用户开放，登录后即可查看回答与对应档案摘录。</p>
+                <p>请先登录后再使用问答。</p>
                 <Link to="/login?next=/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
                   前往登录
                 </Link>
@@ -573,7 +573,7 @@ export default function Home() {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <h2 className="font-serif text-xl font-bold text-ink-dark">对话记录</h2>
-              <p className="mt-1 text-sm text-ink-light">回答将尽量附带可直接查看的档案摘录。</p>
+              <p className="mt-1 text-sm text-ink-light">可查看最近的问答内容。</p>
             </div>
             <p className="text-sm text-ink-light">
               {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '登录后开始提问'}
@@ -586,7 +586,7 @@ export default function Home() {
             <div className="rounded-2xl border border-dashed border-ink-dark/20 bg-white/80 p-8 text-center shadow-sm">
               <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '登录后即可开始问答'}</p>
               <p className="mt-2 text-sm leading-6 text-ink-light">
-                {token ? '可以直接提问校名变更、历史沿革、办学历程等问题。' : '登录后可使用流式问答，并查看回答对应的档案摘录。'}
+                {token ? '可直接输入问题开始。' : '登录后即可使用。'}
               </p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 {token ? QUICK_PROMPTS.slice(0, 3).map((prompt) => (

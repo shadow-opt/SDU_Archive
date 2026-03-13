@@ -57,6 +57,21 @@ export type SubmissionResult = {
   explanation?: string | null;
 };
 
+const QUIZ_ERROR_MESSAGE_MAP: Record<string, string> = {
+  'Already answered': '你已经提交过这道题，可直接查看结果页。',
+  'Invalid answer index': '所选答案无效，请重新选择后再提交。',
+  'Question not found': '题目不存在或已下线，请刷新后重试。',
+  'Collection not found': '专题不存在或已下线，请返回列表重新选择。',
+  'Collection title already exists': '专题名称已存在，请更换后再试。',
+  '登录已过期，请重新登录': '登录已过期，请重新登录。',
+  '权限不足，无法执行该操作': '权限不足，无法执行该操作。',
+};
+
+export const toQuizErrorMessage = (error: unknown, fallback: string): string => {
+  const message = error instanceof Error ? error.message : fallback;
+  return QUIZ_ERROR_MESSAGE_MAP[message] ?? message ?? fallback;
+};
+
 export const buildHistoryMap = (summary: QuizSummary | null) => new Map(summary?.answer_history.map((item) => [item.question_id, item]) ?? []);
 
 export const pickInitialQuestionId = (questions: Question[], historyMap: Map<string, AnswerHistoryItem>, currentId = '') => {
@@ -67,11 +82,23 @@ export const pickInitialQuestionId = (questions: Question[], historyMap: Map<str
   return nextUnanswered?.id ?? questions[0]?.id ?? '';
 };
 
-export const fetchQuizCollections = () => apiRequest<QuizCollection[]>('/api/quiz/collections', { redirectOn401To: '/' }, '专题加载失败');
+export const fetchQuizCollections = (signal?: AbortSignal) => apiRequest<QuizCollection[]>(
+  '/api/quiz/collections',
+  { redirectOn401To: '/', signal },
+  '专题加载失败',
+);
 
-export const fetchQuizQuestions = (collectionId: string) => apiRequest<Question[]>(`/api/quiz/collections/${collectionId}/questions`, { redirectOn401To: '/' }, '题目加载失败');
+export const fetchQuizQuestions = (collectionId: string, signal?: AbortSignal) => apiRequest<Question[]>(
+  `/api/quiz/collections/${collectionId}/questions`,
+  { redirectOn401To: '/', signal },
+  '题目加载失败',
+);
 
-export const fetchQuizSummary = (collectionId: string) => apiRequest<QuizSummary>(`/api/quiz/collections/${collectionId}/summary`, { redirectOn401To: '/' }, '答题记录加载失败');
+export const fetchQuizSummary = (collectionId: string, signal?: AbortSignal) => apiRequest<QuizSummary>(
+  `/api/quiz/collections/${collectionId}/summary`,
+  { redirectOn401To: '/', signal },
+  '答题记录加载失败',
+);
 
 export const submitQuizAnswer = (questionId: string, answerIndex: number) => apiRequest<SubmissionResult>(
   `/api/quiz/questions/${questionId}/submit`,

@@ -6,6 +6,7 @@ import {
   fetchQuizCollections,
   fetchQuizQuestions,
   fetchQuizSummary,
+  toQuizErrorMessage,
   type Question,
   type QuizCollection,
   type QuizSummary,
@@ -26,14 +27,18 @@ export default function QuizResults() {
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reloadSeed, setReloadSeed] = useState(0);
+
+  const reloadResultData = () => setReloadSeed((value) => value + 1);
 
   useEffect(() => {
     if (!token || !collectionId) return;
+    const controller = new AbortController();
     setLoading(true);
     void Promise.all([
-      fetchQuizCollections(),
-      fetchQuizQuestions(collectionId),
-      fetchQuizSummary(collectionId),
+      fetchQuizCollections(controller.signal),
+      fetchQuizQuestions(collectionId, controller.signal),
+      fetchQuizSummary(collectionId, controller.signal),
     ])
       .then(([nextCollections, nextQuestions, nextSummary]) => {
         setCollections(nextCollections);
@@ -42,13 +47,17 @@ export default function QuizResults() {
         setNotice(null);
       })
       .catch((error) => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
         setCollections([]);
         setQuestions([]);
         setSummary(null);
-        setNotice({ msg: error instanceof Error ? error.message : '结果加载失败，请稍后重试', type: 'error' });
+        setNotice({ msg: toQuizErrorMessage(error, '结果加载失败，请稍后重试'), type: 'error' });
       })
       .finally(() => setLoading(false));
-  }, [collectionId, token]);
+    return () => controller.abort();
+  }, [collectionId, reloadSeed, token]);
 
   const selectedCollection = useMemo(
     () => collections.find((collection) => collection.id === collectionId) ?? null,
@@ -67,7 +76,7 @@ export default function QuizResults() {
     );
   }
 
-  if (!loading && !selectedCollection) {
+  if (!loading && !selectedCollection && notice?.type !== 'error') {
     return (
       <div className="max-w-3xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
         <h2 className="text-2xl font-serif font-bold mb-3">专题不存在</h2>
@@ -93,7 +102,7 @@ export default function QuizResults() {
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-sdu-red mb-2">互动答题 / 结果页</p>
             <h1 className="text-3xl font-serif font-bold text-ink-dark mb-3">{selectedCollection?.title ?? '专题结果'}</h1>
-            <p className="text-ink-light max-w-3xl">查看当前专题的累计积分、完成度、最近作答记录与错题回顾。结果会随当前题库规则实时更新。</p>
+            <p className="text-ink-light max-w-3xl">查看本专题作答结果与历史记录。</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/quiz" className="px-4 py-2.5 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors">返回专题列表</Link>
@@ -124,6 +133,15 @@ export default function QuizResults() {
       )}
 
       {notice && <InlineNotice message={notice.msg} type={notice.type} />}
+      {notice?.type === 'error' && !loading && (
+        <button
+          type="button"
+          onClick={reloadResultData}
+          className="px-4 py-2 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors"
+        >
+          重试加载
+        </button>
+      )}
       {loading && <p className="text-sm text-ink-light">加载中...</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -191,7 +209,7 @@ export default function QuizResults() {
             </div>
             <div className="rounded-xl bg-paper-bg/50 px-4 py-4">
               <p className="text-ink-light mb-1">学习建议</p>
-              <p className="text-ink-dark">{remainingCount > 0 ? `还有 ${remainingCount} 道题待完成，建议返回作答页继续完成专题。` : '当前专题已全部完成，可回看错题解析巩固知识点。'}</p>
+              <p className="text-ink-dark">{remainingCount > 0 ? `还有 ${remainingCount} 道题待完成。` : '当前专题已全部完成。'}</p>
             </div>
           </div>
         </aside>

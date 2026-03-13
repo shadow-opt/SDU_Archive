@@ -52,8 +52,16 @@ def ensure_quiz_collections(db: Session) -> None:
         if question.order_index == 0:
             question.order_index = index + 1
         db.add(question)
-    if unassigned_questions:
+    if unassigned_questions or existing_collection_count == 0:
         db.commit()
+
+
+def _commit_or_raise_conflict(db: Session, detail: str) -> None:
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=detail) from exc
 
 
 def _get_collection_or_404(db: Session, collection_id: uuid.UUID, include_unpublished: bool = False) -> QuizCollection:
@@ -280,7 +288,7 @@ def create_collection(payload: QuizCollectionCreate, db: Session = Depends(get_d
         created_by=admin.id,
     )
     db.add(collection)
-    db.commit()
+    _commit_or_raise_conflict(db, "Collection title already exists")
     db.refresh(collection)
     return _build_collection_out(collection, 0, 0, 0)
 
@@ -298,7 +306,7 @@ def update_collection(
     collection.sort_order = payload.sort_order
     collection.is_published = payload.is_published
     db.add(collection)
-    db.commit()
+    _commit_or_raise_conflict(db, "Collection title already exists")
     db.refresh(collection)
     question_count = db.query(func.count(QuizQuestion.id)).filter(QuizQuestion.collection_id == collection.id).scalar() or 0
     return _build_collection_out(collection, int(question_count), 0, 0)
@@ -320,7 +328,11 @@ def delete_collection(collection_id: uuid.UUID, db: Session = Depends(get_db), _
 @router.post("/questions", response_model=QuestionAdminOut)
 def create_question(payload: QuestionCreate, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     ensure_quiz_collections(db)
-    collection = _get_collection_or_404(db, payload.collection_id, include_unpublished=True)
+    collection = (
+        _get_collection_or_404(db, payload.collection_id, include_unpublished=True)
+        if payload.collection_id
+        else _get_or_create_default_collection(db)
+    )
     question = QuizQuestion(
         collection_id=collection.id,
         prompt=payload.prompt,
@@ -333,7 +345,7 @@ def create_question(payload: QuestionCreate, db: Session = Depends(get_db), admi
         created_by=admin.id,
     )
     db.add(question)
-    db.commit()
+    _commit_or_raise_conflict(db, "Question prompt already exists in this collection")
     db.refresh(question)
     return question
 
@@ -372,7 +384,7 @@ def update_question(
     question.question_type = "single_choice"
     question.explanation = payload.explanation
     db.add(question)
-    db.commit()
+    _commit_or_raise_conflict(db, "Question prompt already exists in this collection")
     db.refresh(question)
     return question
 
@@ -472,7 +484,7 @@ async def import_questions_csv(
         created += 1
         if prompt_key:
             seen_prompts.add(prompt_key)
-    db.commit()
+    _commit_or_raise_conflict(db, "CSV import conflicts with existing data")
     return QuizImportResult(
         collection_id=target_collection.id,
         collection_title=target_collection.title,

@@ -96,6 +96,54 @@ def _build_test_client():
 	return TestClient(app), db, user, admin, collection, q1, q2, current_user_ref
 
 
+def _build_empty_quiz_client():
+	engine = create_engine(
+		"sqlite+pysqlite:///:memory:",
+		connect_args={"check_same_thread": False},
+		poolclass=StaticPool,
+	)
+	SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+	User.__table__.create(bind=engine)
+	QuizCollection.__table__.create(bind=engine)
+	QuizQuestion.__table__.create(bind=engine)
+	AnswerRecord.__table__.create(bind=engine)
+	UserScore.__table__.create(bind=engine)
+
+	db = SessionLocal()
+	user = User(id=uuid.uuid4(), email="quiz-user@example.com", password_hash="x", role="user", is_active=True)
+	admin = User(id=uuid.uuid4(), email="quiz-admin@example.com", password_hash="x", role="admin", is_active=True)
+	db.add_all([user, admin])
+	db.commit()
+
+	app = FastAPI()
+	app.include_router(quiz.router)
+
+	current_user_ref = {"value": user}
+
+	def override_get_db():
+		try:
+			yield db
+		finally:
+			pass
+
+	def override_get_current_user():
+		return current_user_ref["value"]
+
+	def override_require_admin():
+		return admin
+
+	def override_rate_limiter():
+		return True
+
+	app.dependency_overrides[get_db] = override_get_db
+	app.dependency_overrides[get_current_user] = override_get_current_user
+	app.dependency_overrides[require_admin] = override_require_admin
+	app.dependency_overrides[rate_limiter] = override_rate_limiter
+
+	return TestClient(app), db, user, admin, current_user_ref
+
+
 def test_collections_questions_and_summary_are_recoverable():
 	client, _db, _user, _admin, collection, q1, q2, _user_ref = _build_test_client()
 
@@ -222,6 +270,124 @@ def test_duplicate_submission_is_rejected():
 	second = client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 1})
 	assert second.status_code == 400
 	assert second.json()["detail"] == "Already answered"
+
+
+def test_invalid_answer_index_is_rejected():
+	client, _db, _user, _admin, _collection, q1, _q2, _user_ref = _build_test_client()
+
+	negative = client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": -1})
+	assert negative.status_code == 422
+
+	too_large = client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 99})
+	assert too_large.status_code == 400
+	assert too_large.json()["detail"] == "Invalid answer index"
+
+
+def test_duplicate_collection_title_returns_400():
+	client, _db, _user, _admin, collection, _q1, _q2, _user_ref = _build_test_client()
+
+	response = client.post(
+		"/api/quiz/collections",
+		json={
+			"title": collection.title,
+			"description": "重复标题",
+			"sort_order": 2,
+			"is_published": True,
+		},
+	)
+	assert response.status_code == 400
+	assert response.json()["detail"] == "Collection title already exists"
+
+
+def test_update_collection_with_duplicate_title_returns_400():
+	client, db, _user, admin, collection, _q1, _q2, _user_ref = _build_test_client()
+
+	extra_collection = QuizCollection(
+		id=uuid.uuid4(),
+		title="第二专题",
+		description="用于冲突测试",
+		sort_order=2,
+		is_published=True,
+		created_by=admin.id,
+	)
+	db.add(extra_collection)
+	db.commit()
+
+	response = client.put(
+		f"/api/quiz/collections/{extra_collection.id}",
+		json={
+			"title": collection.title,
+			"description": extra_collection.description,
+			"sort_order": extra_collection.sort_order,
+			"is_published": True,
+		},
+	)
+	assert response.status_code == 400
+	assert response.json()["detail"] == "Collection title already exists"
+
+
+def test_unpublished_collection_is_hidden_for_user_endpoints():
+	client, db, admin_user, _admin, _collection, _q1, _q2, _user_ref = _build_test_client()
+
+	hidden_collection = QuizCollection(
+		id=uuid.uuid4(),
+		title="未发布专题",
+		description="仅管理员可见",
+		sort_order=99,
+		is_published=False,
+		created_by=admin_user.id,
+	)
+	hidden_question = QuizQuestion(
+		id=uuid.uuid4(),
+		collection_id=hidden_collection.id,
+		prompt="未发布问题",
+		options=["A", "B", "C", "D"],
+		correct_index=0,
+		points=1,
+		question_type="single_choice",
+		order_index=1,
+	)
+	db.add_all([hidden_collection, hidden_question])
+	db.commit()
+
+	response = client.get(f"/api/quiz/collections/{hidden_collection.id}/questions")
+	assert response.status_code == 404
+	assert response.json()["detail"] == "Collection not found"
+
+
+def test_empty_quiz_bootstrap_persists_default_collection():
+	client, db, _user, _admin, _user_ref = _build_empty_quiz_client()
+
+	first = client.get("/api/quiz/collections")
+	assert first.status_code == 200
+	first_payload = first.json()
+	assert len(first_payload) == 1
+	assert first_payload[0]["title"] == quiz.DEFAULT_COLLECTION_TITLE
+	assert db.query(QuizCollection).count() == 1
+
+	second = client.get("/api/quiz/collections")
+	assert second.status_code == 200
+	assert len(second.json()) == 1
+	assert db.query(QuizCollection).count() == 1
+
+
+def test_create_question_without_collection_id_falls_back_to_default_collection():
+	client, _db, _user, _admin, _collection, _q1, _q2, _user_ref = _build_test_client()
+
+	response = client.post(
+		"/api/quiz/questions",
+		json={
+			"prompt": "未指定专题时应落到默认题库",
+			"options": ["A", "B", "C", "D"],
+			"correct_index": 1,
+			"points": 2,
+			"question_type": "single_choice",
+			"explanation": "兼容旧调用方",
+		},
+	)
+	assert response.status_code == 200
+	payload = response.json()
+	assert payload["collection_id"] is not None
 
 
 def test_import_csv_returns_detailed_feedback():

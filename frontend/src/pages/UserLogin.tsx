@@ -65,13 +65,8 @@ export default function UserLogin() {
             titleClassName="text-3xl"
           />
           <p className="mt-6 text-sm leading-7 text-ink-light md:text-base">
-            登录后即可使用校史 AI 问答，系统会基于档案内容返回精简回答，并附带对应的摘录依据。
+            登录后即可开始使用。
           </p>
-          <div className="mt-8 space-y-3 rounded-2xl border border-ink-dark/10 bg-white/75 p-4 text-sm text-ink-light">
-            <p>• 支持连续追问</p>
-            <p>• 回答以 Markdown 展示</p>
-            <p>• 引用区仅展示面向用户的档案摘录</p>
-          </div>
           <div className="mt-8 flex flex-wrap gap-3 text-sm">
             <Link to="/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
               返回 AI 问答
@@ -85,7 +80,7 @@ export default function UserLogin() {
         <div className="rounded-3xl border border-ink-dark/10 bg-paper-bg/60 p-6 md:p-8">
           <div>
             <h1 className="text-2xl font-serif font-bold text-ink-dark">登录</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-light">请输入管理员分配的账号信息。</p>
+            <p className="mt-2 text-sm leading-6 text-ink-light">请输入账号信息。</p>
           </div>
 
           <form onSubmit={handleLogin} className="mt-8 space-y-5">

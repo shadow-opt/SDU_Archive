@@ -9,6 +9,7 @@ import {
   fetchQuizSummary,
   pickInitialQuestionId,
   submitQuizAnswer,
+  toQuizErrorMessage,
   type AnswerHistoryItem,
   type Question,
   type QuizCollection,
@@ -27,14 +28,18 @@ export default function QuizPlay() {
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reloadSeed, setReloadSeed] = useState(0);
+
+  const reloadQuizData = () => setReloadSeed((value) => value + 1);
 
   useEffect(() => {
     if (!token || !collectionId) return;
+    const controller = new AbortController();
     setLoading(true);
     void Promise.all([
-      fetchQuizCollections(),
-      fetchQuizQuestions(collectionId),
-      fetchQuizSummary(collectionId),
+      fetchQuizCollections(controller.signal),
+      fetchQuizQuestions(collectionId, controller.signal),
+      fetchQuizSummary(collectionId, controller.signal),
     ])
       .then(([nextCollections, nextQuestions, nextSummary]) => {
         const historyMap = buildHistoryMap(nextSummary);
@@ -50,10 +55,14 @@ export default function QuizPlay() {
         setQuestions([]);
         setSummary(null);
         setSelectedQuestionId('');
-        setNotice({ msg: error instanceof Error ? error.message : '题目加载失败，请稍后重试', type: 'error' });
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        setNotice({ msg: toQuizErrorMessage(error, '题目加载失败，请稍后重试'), type: 'error' });
       })
       .finally(() => setLoading(false));
-  }, [collectionId, token]);
+    return () => controller.abort();
+  }, [collectionId, reloadSeed, token]);
 
   const selectedCollection = useMemo(
     () => collections.find((collection) => collection.id === collectionId) ?? null,
@@ -82,7 +91,23 @@ export default function QuizPlay() {
         },
       });
     } catch (error) {
-      setNotice({ msg: error instanceof Error ? error.message : '提交失败，请稍后重试', type: 'error' });
+      const message = toQuizErrorMessage(error, '提交失败，请稍后重试');
+      if (message.includes('你已经提交过这道题')) {
+        try {
+          const [nextQuestions, nextSummary] = await Promise.all([
+            fetchQuizQuestions(collectionId),
+            fetchQuizSummary(collectionId),
+          ]);
+          setQuestions(nextQuestions);
+          setSummary(nextSummary);
+          setSelectedOption(null);
+          setNotice({ msg: message, type: 'info' });
+        } catch {
+          setNotice({ msg: message, type: 'info' });
+        }
+      } else {
+        setNotice({ msg: message, type: 'error' });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -100,7 +125,7 @@ export default function QuizPlay() {
     );
   }
 
-  if (!loading && !selectedCollection) {
+  if (!loading && !selectedCollection && notice?.type !== 'error') {
     return (
       <div className="max-w-3xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
         <h2 className="text-2xl font-serif font-bold mb-3">专题不存在</h2>
@@ -119,7 +144,7 @@ export default function QuizPlay() {
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-sdu-red mb-2">互动答题 / 作答页</p>
             <h1 className="text-3xl font-serif font-bold text-ink-dark mb-3">{selectedCollection?.title ?? '专题作答'}</h1>
-            <p className="text-ink-light max-w-3xl">{selectedCollection?.description || '选择题目后提交答案，已作答题目可立即查看结果页中的累计表现与解析。'}</p>
+            <p className="text-ink-light max-w-3xl">{selectedCollection?.description || '选择题目并提交答案。'}</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link to="/quiz" className="px-4 py-2.5 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors">返回专题列表</Link>
@@ -132,7 +157,16 @@ export default function QuizPlay() {
         </div>
       </div>
 
-      {notice && !submitting && <InlineNotice message={notice.msg} type={notice.type} />}
+      {notice && <InlineNotice message={notice.msg} type={notice.type} />}
+      {notice?.type === 'error' && !loading && (
+        <button
+          type="button"
+          onClick={reloadQuizData}
+          className="px-4 py-2 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors"
+        >
+          重试加载
+        </button>
+      )}
       {loading && <p className="text-sm text-ink-light">加载中...</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -252,6 +286,7 @@ export default function QuizPlay() {
                           name="quiz-option"
                           checked={checked}
                           onChange={() => setSelectedOption(index)}
+                          disabled={submitting}
                           className="mt-1"
                         />
                         <span>{option}</span>

@@ -2,27 +2,35 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
 import { getAuthToken } from '../services/api';
-import { fetchQuizCollections, type QuizCollection } from './quiz/shared';
+import { fetchQuizCollections, toQuizErrorMessage, type QuizCollection } from './quiz/shared';
 
 export default function QuizTopics() {
   const token = getAuthToken();
   const [collections, setCollections] = useState<QuizCollection[]>([]);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [reloadSeed, setReloadSeed] = useState(0);
+
+  const reloadTopics = () => setReloadSeed((value) => value + 1);
 
   useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
     setLoading(true);
-    void fetchQuizCollections()
+    void fetchQuizCollections(controller.signal)
       .then((data) => {
         setCollections(data);
         setNotice(null);
       })
       .catch((error) => {
-        setNotice({ msg: error instanceof Error ? error.message : '专题加载失败，请稍后重试', type: 'error' });
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+        setNotice({ msg: toQuizErrorMessage(error, '专题加载失败，请稍后重试'), type: 'error' });
       })
       .finally(() => setLoading(false));
-  }, [token]);
+    return () => controller.abort();
+  }, [reloadSeed, token]);
 
   const totalQuestions = useMemo(
     () => collections.reduce((sum, collection) => sum + collection.question_count, 0),
@@ -76,12 +84,21 @@ export default function QuizTopics() {
       </section>
 
       {notice && <InlineNotice message={notice.msg} type={notice.type} />}
+      {notice?.type === 'error' && !loading && (
+        <button
+          type="button"
+          onClick={reloadTopics}
+          className="px-4 py-2 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors"
+        >
+          重试加载
+        </button>
+      )}
 
       {loading && <p className="text-sm text-ink-light">加载中...</p>}
 
       {!loading && !collections.length && (
         <div className="bg-white border border-ink-dark/10 rounded-2xl p-8 text-center text-ink-light">
-          当前还没有已发布的专题，请稍后再来。
+          暂无可用专题。
         </div>
       )}
 
