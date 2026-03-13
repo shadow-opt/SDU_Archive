@@ -56,7 +56,7 @@ export default function UserLogin() {
   return (
     <div className="mx-auto flex min-h-[72vh] max-w-5xl items-center justify-center px-4 py-8">
       <div className="grid w-full max-w-4xl gap-6 rounded-[28px] border border-ink-dark/10 bg-white p-6 shadow-xl md:grid-cols-[1.05fr_0.95fr] md:p-8">
-        <div className="rounded-3xl bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.12),transparent_42%),linear-gradient(180deg,rgba(255,248,248,0.95),rgba(255,255,255,0.98))] p-6 md:p-8">
+        <div className="rounded-3xl bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.12),transparent_42%),linear-gradient(180deg,rgba(255,248,248,0.95),rgba(255,255,255,0.98))] p-6 md:p-8 flex h-full flex-col">
           <BrandLogo
             title="校史知识库"
             subtitle="登录后使用 AI 问答"
@@ -67,7 +67,7 @@ export default function UserLogin() {
           <p className="mt-6 text-sm leading-7 text-ink-light md:text-base">
             登录后即可开始使用。
           </p>
-          <div className="mt-8 flex flex-wrap gap-3 text-sm">
+          <div className="mt-auto pt-6 flex flex-wrap gap-3 text-sm">
             <Link to="/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
               返回 AI 问答
             </Link>
