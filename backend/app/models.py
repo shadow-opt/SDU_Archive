@@ -78,6 +78,7 @@ class QuizCollection(Base):
 
 class QuizQuestion(Base):
     __tablename__ = "quiz_questions"
+    __table_args__ = (UniqueConstraint("collection_id", "order_index", name="uq_quiz_question_collection_order"),)
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     collection_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("quiz_collections.id"), nullable=True, index=True)
@@ -87,7 +88,7 @@ class QuizQuestion(Base):
     question_type: Mapped[str] = mapped_column(String(32), default="single_choice", nullable=False)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     points: Mapped[int] = mapped_column(Integer, default=1)
-    order_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

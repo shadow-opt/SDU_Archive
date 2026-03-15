@@ -170,7 +170,7 @@ class QuestionBase(BaseModel):
     points: int = Field(default=1, ge=1)
     question_type: Literal["single_choice"] = "single_choice"
     explanation: Optional[str] = None
-    order_index: int = Field(default=0, ge=0)
+    order_index: int = Field(default=1, ge=1)
 
     @field_validator('prompt')
     @classmethod

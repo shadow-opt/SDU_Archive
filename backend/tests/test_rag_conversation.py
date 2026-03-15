@@ -16,6 +16,9 @@ from backend.app.models import Conversation, Message, User
 
 class _DummyDoc:
     title = "档案A"
+    filename = "archive-a.pdf"
+    year_or_period = "近现代"
+    doc_type = "校史档案"
 
 
 class _DummyChunk:

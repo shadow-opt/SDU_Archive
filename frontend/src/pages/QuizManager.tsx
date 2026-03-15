@@ -153,7 +153,7 @@ export default function QuizManager() {
 
   const resetDrawer = () => {
     setEditingId(null);
-    setForm({ ...initialForm, collection_id: selectedCollectionId, order_index: questions.length + 1 });
+    setForm({ ...initialForm, collection_id: selectedCollectionId, order_index: 1 });
     setDrawerOpen(false);
   };
 
@@ -295,7 +295,7 @@ export default function QuizManager() {
 
   const openCreateDrawer = () => {
     setEditingId(null);
-    setForm({ ...initialForm, collection_id: selectedCollectionId, order_index: questions.length + 1 });
+    setForm({ ...initialForm, collection_id: selectedCollectionId, order_index: 1 });
     setDrawerOpen(true);
   };
 
@@ -485,7 +485,7 @@ export default function QuizManager() {
             placeholder="按题干、选项或解析搜索..."
             className="w-full mb-4 px-4 py-3 rounded-lg border border-ink-dark/20"
           />
-          <p className="text-xs text-ink-light mb-4">CSV 格式：prompt,options,correct_index,points,explanation,order_index，其中 options 用 | 分隔；当前版本仅支持单选题，且会返回逐行导入反馈。</p>
+          <p className="text-xs text-ink-light mb-4">CSV 格式：prompt,options,correct_index,points,explanation,order_index，其中 options 用 | 分隔、correct_index 为 0-based（0=第一个选项）；order_index 可留空自动追加并重排。</p>
 
           {importReport && (
             <div className="mb-4 rounded-2xl border border-ink-dark/10 bg-paper-bg/40 p-4">
@@ -685,11 +685,12 @@ export default function QuizManager() {
                   <label className="block text-sm font-medium mb-1">排序序号</label>
                   <input
                     type="number"
-                    min={0}
+                    min={1}
                     value={form.order_index}
-                    onChange={(e) => setForm((prev) => ({ ...prev, order_index: Number(e.target.value) || 0 }))}
+                    onChange={(e) => setForm((prev) => ({ ...prev, order_index: Number(e.target.value) || 1 }))}
                     className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
                   />
+                  <p className="text-xs text-ink-light mt-1">编号从 1 开始；若与现有编号冲突，系统会自动重排。</p>
                 </div>
               </div>
 

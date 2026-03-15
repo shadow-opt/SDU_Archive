@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     with get_session() as db:
         ensure_admin(db)
         quiz.ensure_quiz_collections(db)
+    ensure_quiz_order_constraint()
     yield
     # Shutdown (nothing needed)
 
@@ -119,7 +120,9 @@ def run_compat_migrations():
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS collection_id UUID REFERENCES quiz_collections(id)",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type VARCHAR(32) NOT NULL DEFAULT 'single_choice'",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS explanation TEXT",
-        "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS order_index INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE quiz_questions ALTER COLUMN order_index SET DEFAULT 1",
+        "UPDATE quiz_questions SET order_index = 1 WHERE order_index < 1",
         "ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()",
         "ALTER TABLE user_scores ADD COLUMN IF NOT EXISTS total_answers INTEGER NOT NULL DEFAULT 0",
         """
@@ -163,3 +166,19 @@ def run_compat_migrations():
     with engine.begin() as conn:
         for statement in statements:
             conn.execute(text(statement))
+
+
+def ensure_quiz_order_constraint():
+    if engine.dialect.name != "postgresql":
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_quiz_question_collection_order
+                ON quiz_questions(collection_id, order_index)
+                WHERE collection_id IS NOT NULL
+                """
+            )
+        )

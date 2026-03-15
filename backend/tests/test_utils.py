@@ -1,5 +1,6 @@
 import asyncio
 
+from backend.app.config import get_settings
 from backend.app.documents import split_text
 from backend.app.utils.embedding import embed_text
 
@@ -15,7 +16,7 @@ def test_split_text_respects_overlap():
 
 def test_embed_text_returns_fixed_length():
     result = asyncio.run(embed_text("hello world"))
-    assert len(result) == 1536
+    assert len(result) == get_settings().embedding_dimension
     # deterministic fallback: same input -> same vector
     again = asyncio.run(embed_text("hello world"))
     assert result == again

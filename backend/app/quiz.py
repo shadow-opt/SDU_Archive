@@ -45,6 +45,8 @@ def ensure_quiz_collections(db: Session) -> None:
     existing_collection_count = db.query(func.count(QuizCollection.id)).scalar() or 0
     unassigned_questions = db.query(QuizQuestion).filter(QuizQuestion.collection_id.is_(None)).all()
     if not unassigned_questions and existing_collection_count > 0:
+        if normalize_all_question_orders(db):
+            db.commit()
         return
     default_collection = _get_or_create_default_collection(db)
     for index, question in enumerate(unassigned_questions):
@@ -52,7 +54,8 @@ def ensure_quiz_collections(db: Session) -> None:
         if question.order_index == 0:
             question.order_index = index + 1
         db.add(question)
-    if unassigned_questions or existing_collection_count == 0:
+    changed = normalize_all_question_orders(db)
+    if unassigned_questions or existing_collection_count == 0 or changed:
         db.commit()
 
 
@@ -62,6 +65,149 @@ def _commit_or_raise_conflict(db: Session, detail: str) -> None:
     except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=detail) from exc
+
+
+def _normalize_order_target(raw_order_index: int, upper_bound: int) -> int:
+    if upper_bound <= 0:
+        return 1
+    return max(1, min(raw_order_index, upper_bound))
+
+
+def _next_order_index(db: Session, collection_id: uuid.UUID) -> int:
+    max_order = (
+        db.query(func.max(QuizQuestion.order_index))
+        .filter(QuizQuestion.collection_id == collection_id)
+        .scalar()
+    )
+    return int(max_order or 0) + 1
+
+
+def _shift_for_insert(db: Session, collection_id: uuid.UUID, order_index: int) -> None:
+    affected_questions = (
+        db.query(QuizQuestion)
+        .filter(
+            QuizQuestion.collection_id == collection_id,
+            QuizQuestion.order_index >= order_index,
+        )
+        .order_by(QuizQuestion.order_index.desc(), QuizQuestion.id.desc())
+        .all()
+    )
+    staged_updates: list[tuple[QuizQuestion, int]] = []
+    for question in affected_questions:
+        staged_updates.append((question, question.order_index + 1))
+    for index, (question, _) in enumerate(staged_updates, start=1):
+        question.order_index = -index
+        db.add(question)
+    if staged_updates:
+        db.flush()
+    for question, target_order in staged_updates:
+        question.order_index = target_order
+        db.add(question)
+
+
+def _shift_after_delete(db: Session, collection_id: uuid.UUID, deleted_order_index: int) -> None:
+    affected_questions = (
+        db.query(QuizQuestion)
+        .filter(
+            QuizQuestion.collection_id == collection_id,
+            QuizQuestion.order_index > deleted_order_index,
+        )
+        .order_by(QuizQuestion.order_index.asc(), QuizQuestion.id.asc())
+        .all()
+    )
+    staged_updates: list[tuple[QuizQuestion, int]] = []
+    for question in affected_questions:
+        staged_updates.append((question, question.order_index - 1))
+    for index, (question, _) in enumerate(staged_updates, start=1):
+        question.order_index = -index
+        db.add(question)
+    if staged_updates:
+        db.flush()
+    for question, target_order in staged_updates:
+        question.order_index = target_order
+        db.add(question)
+
+
+def _move_within_collection(
+    db: Session,
+    collection_id: uuid.UUID,
+    question_id: uuid.UUID,
+    current_order: int,
+    target_order: int,
+) -> None:
+    if target_order == current_order:
+        return
+    if target_order < current_order:
+        affected_questions = (
+            db.query(QuizQuestion)
+            .filter(
+                QuizQuestion.collection_id == collection_id,
+                QuizQuestion.id != question_id,
+                QuizQuestion.order_index >= target_order,
+                QuizQuestion.order_index < current_order,
+            )
+            .order_by(QuizQuestion.order_index.desc(), QuizQuestion.id.desc())
+            .all()
+        )
+        staged_updates: list[tuple[QuizQuestion, int]] = []
+        for question in affected_questions:
+            staged_updates.append((question, question.order_index + 1))
+        for index, (question, _) in enumerate(staged_updates, start=1):
+            question.order_index = -index
+            db.add(question)
+        if staged_updates:
+            db.flush()
+        for question, next_order in staged_updates:
+            question.order_index = next_order
+            db.add(question)
+        return
+    affected_questions = (
+        db.query(QuizQuestion)
+        .filter(
+            QuizQuestion.collection_id == collection_id,
+            QuizQuestion.id != question_id,
+            QuizQuestion.order_index > current_order,
+            QuizQuestion.order_index <= target_order,
+        )
+        .order_by(QuizQuestion.order_index.asc(), QuizQuestion.id.asc())
+        .all()
+    )
+    staged_updates: list[tuple[QuizQuestion, int]] = []
+    for question in affected_questions:
+        staged_updates.append((question, question.order_index - 1))
+    for index, (question, _) in enumerate(staged_updates, start=1):
+        question.order_index = -index
+        db.add(question)
+    if staged_updates:
+        db.flush()
+    for question, next_order in staged_updates:
+        question.order_index = next_order
+        db.add(question)
+
+
+def _compact_collection_orders(db: Session, collection_id: uuid.UUID) -> bool:
+    questions = (
+        db.query(QuizQuestion)
+        .filter(QuizQuestion.collection_id == collection_id)
+        .order_by(QuizQuestion.order_index.asc(), QuizQuestion.created_at.asc(), QuizQuestion.id.asc())
+        .all()
+    )
+    changed = False
+    for index, question in enumerate(questions, start=1):
+        if question.order_index != index:
+            question.order_index = index
+            db.add(question)
+            changed = True
+    return changed
+
+
+def normalize_all_question_orders(db: Session) -> bool:
+    collection_ids = [collection_id for (collection_id,) in db.query(QuizCollection.id).all()]
+    changed = False
+    for collection_id in collection_ids:
+        if _compact_collection_orders(db, collection_id):
+            changed = True
+    return changed
 
 
 def _get_collection_or_404(db: Session, collection_id: uuid.UUID, include_unpublished: bool = False) -> QuizCollection:
@@ -333,6 +479,14 @@ def create_question(payload: QuestionCreate, db: Session = Depends(get_db), admi
         if payload.collection_id
         else _get_or_create_default_collection(db)
     )
+    target_order = payload.order_index
+    if payload.collection_id is None:
+        target_order = _next_order_index(db, collection.id)
+    else:
+        question_count = db.query(func.count(QuizQuestion.id)).filter(QuizQuestion.collection_id == collection.id).scalar() or 0
+        target_order = _normalize_order_target(payload.order_index, int(question_count) + 1)
+    _shift_for_insert(db, collection.id, target_order)
+
     question = QuizQuestion(
         collection_id=collection.id,
         prompt=payload.prompt,
@@ -341,11 +495,11 @@ def create_question(payload: QuestionCreate, db: Session = Depends(get_db), admi
         question_type="single_choice",
         explanation=payload.explanation,
         points=payload.points,
-        order_index=payload.order_index,
+        order_index=target_order,
         created_by=admin.id,
     )
     db.add(question)
-    _commit_or_raise_conflict(db, "Question prompt already exists in this collection")
+    _commit_or_raise_conflict(db, "Question order conflict")
     db.refresh(question)
     return question
 
@@ -375,16 +529,35 @@ def update_question(
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
     _get_collection_or_404(db, payload.collection_id, include_unpublished=True)
+
+    source_collection_id = question.collection_id or payload.collection_id
+    source_order = question.order_index
+    target_collection_id = payload.collection_id
+
+    if source_collection_id == target_collection_id:
+        question_count = db.query(func.count(QuizQuestion.id)).filter(QuizQuestion.collection_id == target_collection_id).scalar() or 0
+        target_order = _normalize_order_target(payload.order_index, int(question_count))
+        if target_order != source_order:
+            question.order_index = 0
+            db.add(question)
+            db.flush()
+        _move_within_collection(db, target_collection_id, question.id, source_order, target_order)
+    else:
+        _shift_after_delete(db, source_collection_id, source_order)
+        target_count = db.query(func.count(QuizQuestion.id)).filter(QuizQuestion.collection_id == target_collection_id).scalar() or 0
+        target_order = _normalize_order_target(payload.order_index, int(target_count) + 1)
+        _shift_for_insert(db, target_collection_id, target_order)
+
     question.collection_id = payload.collection_id
     question.prompt = payload.prompt
     question.options = payload.options
     question.correct_index = payload.correct_index
     question.points = payload.points
-    question.order_index = payload.order_index
+    question.order_index = target_order
     question.question_type = "single_choice"
     question.explanation = payload.explanation
     db.add(question)
-    _commit_or_raise_conflict(db, "Question prompt already exists in this collection")
+    _commit_or_raise_conflict(db, "Question order conflict")
     db.refresh(question)
     return question
 
@@ -394,8 +567,12 @@ def delete_question(question_id: uuid.UUID, db: Session = Depends(get_db), _: Us
     question = db.get(QuizQuestion, question_id)
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+    collection_id = question.collection_id
+    order_index = question.order_index
     db.query(AnswerRecord).filter(AnswerRecord.question_id == question_id).delete()
     db.delete(question)
+    if collection_id is not None:
+        _shift_after_delete(db, collection_id, order_index)
     db.commit()
     return {"ok": True}
 
@@ -423,19 +600,13 @@ async def import_questions_csv(
     if not required_headers.issubset(set(reader.fieldnames or [])):
         raise HTTPException(status_code=400, detail="CSV 列缺失，需包含 prompt, options, correct_index, points")
 
-    existing_prompts = {
-        (prompt or "").strip().casefold()
-        for (prompt,) in db.query(QuizQuestion.prompt).filter(QuizQuestion.collection_id == target_collection.id).all()
-        if (prompt or "").strip()
-    }
-    seen_prompts: set[str] = set()
     issues: list[QuizImportRowIssue] = []
     created = 0
     total_rows = 0
+    next_order = _next_order_index(db, target_collection.id)
     for row_number, row in enumerate(reader, start=2):
         total_rows += 1
         prompt = (row.get("prompt") or "").strip()
-        prompt_key = prompt.casefold()
         question_type = (row.get("question_type") or "single_choice").strip() or "single_choice"
         if not any((value or "").strip() for value in row.values()):
             issues.append(QuizImportRowIssue(row_number=row_number, prompt=None, error="空行或无有效内容"))
@@ -443,10 +614,9 @@ async def import_questions_csv(
         if question_type != "single_choice":
             issues.append(QuizImportRowIssue(row_number=row_number, prompt=prompt or None, error="仅支持 single_choice 题型"))
             continue
-        if prompt_key and (prompt_key in seen_prompts or prompt_key in existing_prompts):
-            issues.append(QuizImportRowIssue(row_number=row_number, prompt=prompt, error="当前专题已存在相同题干"))
-            continue
         try:
+            raw_order_index = (row.get("order_index") or "").strip()
+            parsed_order_index = int(raw_order_index) if raw_order_index else next_order
             payload = QuestionCreate(
                 collection_id=target_collection.id,
                 prompt=prompt,
@@ -455,7 +625,7 @@ async def import_questions_csv(
                 points=int(row.get("points") or 1),
                 question_type="single_choice",
                 explanation=(row.get("explanation") or None),
-                order_index=int(row.get("order_index") or (row_number - 1)),
+                order_index=parsed_order_index,
             )
         except ValidationError as exc:
             issues.append(
@@ -469,6 +639,8 @@ async def import_questions_csv(
         except ValueError as exc:
             issues.append(QuizImportRowIssue(row_number=row_number, prompt=prompt or None, error=str(exc)))
             continue
+        target_order = _normalize_order_target(payload.order_index, next_order)
+        _shift_for_insert(db, target_collection.id, target_order)
         db.add(
             QuizQuestion(
                 collection_id=target_collection.id,
@@ -478,13 +650,12 @@ async def import_questions_csv(
                 points=payload.points,
                 question_type="single_choice",
                 explanation=payload.explanation,
-                order_index=payload.order_index,
+                order_index=target_order,
             )
         )
         created += 1
-        if prompt_key:
-            seen_prompts.add(prompt_key)
-    _commit_or_raise_conflict(db, "CSV import conflicts with existing data")
+        next_order += 1
+    _commit_or_raise_conflict(db, "CSV import conflicts with question ordering")
     return QuizImportResult(
         collection_id=target_collection.id,
         collection_title=target_collection.title,

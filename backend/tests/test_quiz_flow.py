@@ -388,6 +388,74 @@ def test_create_question_without_collection_id_falls_back_to_default_collection(
 	assert response.status_code == 200
 	payload = response.json()
 	assert payload["collection_id"] is not None
+	assert payload["order_index"] >= 1
+
+
+def test_create_question_with_conflicting_order_reorders_existing_questions():
+	client, _db, _user, _admin, collection, q1, q2, _user_ref = _build_test_client()
+
+	response = client.post(
+		"/api/quiz/questions",
+		json={
+			"collection_id": str(collection.id),
+			"prompt": "插入到第一题",
+			"options": ["A", "B", "C", "D"],
+			"correct_index": 0,
+			"points": 1,
+			"question_type": "single_choice",
+			"explanation": "测试自动重排",
+			"order_index": 1,
+		},
+	)
+	assert response.status_code == 200
+	created = response.json()
+	assert created["order_index"] == 1
+
+	questions = client.get(f"/api/quiz/questions/admin?collection_id={collection.id}")
+	assert questions.status_code == 200
+	by_id = {item["id"]: item for item in questions.json()}
+	assert by_id[created["id"]]["order_index"] == 1
+	assert by_id[str(q1.id)]["order_index"] == 2
+	assert by_id[str(q2.id)]["order_index"] == 3
+
+
+def test_update_question_order_reorders_within_collection():
+	client, _db, _user, _admin, collection, q1, q2, _user_ref = _build_test_client()
+
+	response = client.put(
+		f"/api/quiz/questions/{q2.id}",
+		json={
+			"collection_id": str(collection.id),
+			"prompt": "山东大学校训中不包含下列哪项？",
+			"options": ["学无止境", "气有浩然", "学术自由", "海纳百川"],
+			"correct_index": 3,
+			"points": 3,
+			"question_type": "single_choice",
+			"explanation": "校训为学无止境，气有浩然。",
+			"order_index": 1,
+		},
+	)
+	assert response.status_code == 200
+
+	questions = client.get(f"/api/quiz/questions/admin?collection_id={collection.id}")
+	assert questions.status_code == 200
+	by_id = {item["id"]: item for item in questions.json()}
+	assert by_id[str(q2.id)]["order_index"] == 1
+	assert by_id[str(q1.id)]["order_index"] == 2
+
+
+def test_delete_question_compacts_order_index():
+	client, _db, _user, _admin, collection, q1, q2, _user_ref = _build_test_client()
+
+	delete = client.delete(f"/api/quiz/questions/{q1.id}")
+	assert delete.status_code == 200
+
+	questions = client.get(f"/api/quiz/questions/admin?collection_id={collection.id}")
+	assert questions.status_code == 200
+	payload = questions.json()
+	assert len(payload) == 1
+	assert payload[0]["id"] == str(q2.id)
+	assert payload[0]["order_index"] == 1
 
 
 def test_import_csv_returns_detailed_feedback():
@@ -397,8 +465,8 @@ def test_import_csv_returns_detailed_feedback():
 		"file": (
 			"questions.csv",
 			"prompt,options,correct_index,points,explanation,order_index\n"
-			"新增题目,A|B|C,1,2,解析,3\n"
-			"新增题目,A|B|C,1,2,重复题干,4\n"
+			"新增题目,A|B|C,1,2,解析,\n"
+			"新增题目,A|B|C,1,2,重复题干,\n"
 			"坏题目,A,5,0,参数错误,5\n",
 			"text/csv",
 		),
@@ -413,15 +481,15 @@ def test_import_csv_returns_detailed_feedback():
 	assert payload["collection_id"] == str(collection.id)
 	assert payload["collection_title"] == collection.title
 	assert payload["total_rows"] == 3
-	assert payload["created"] == 1
-	assert payload["skipped"] == 2
-	assert len(payload["issues"]) == 2
-	assert payload["issues"][0]["row_number"] == 3
-	assert payload["issues"][1]["row_number"] == 4
+	assert payload["created"] == 2
+	assert payload["skipped"] == 1
+	assert len(payload["issues"]) == 1
+	assert payload["issues"][0]["row_number"] == 4
 
 	questions = client.get(f"/api/quiz/questions/admin?collection_id={collection.id}")
 	assert questions.status_code == 200
-	assert len(questions.json()) == 3
+	assert len(questions.json()) == 4
+	assert [item["order_index"] for item in questions.json()] == [1, 2, 3, 4]
 
 
 def test_collection_dashboard_supports_topic_metrics_and_filters():
