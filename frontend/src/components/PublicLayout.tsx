@@ -8,6 +8,7 @@ export default function PublicLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
   const isQuizRoute = location.pathname.startsWith('/quiz');
+  const isHomeRoute = location.pathname === '/';
 
   useEffect(() => {
     const syncAuthState = () => setIsLoggedIn(Boolean(getAuthToken()));
@@ -63,7 +64,7 @@ export default function PublicLayout() {
         ) : null}
       </header>
 
-      <main className={`flex-1 w-full px-4 sm:px-6 md:py-12 ${isQuizRoute ? 'py-3 sm:py-6' : 'py-8'}`}>
+      <main className={`flex-1 w-full px-3 sm:px-6 md:py-12 ${isQuizRoute ? 'py-3 sm:py-6' : isHomeRoute ? 'py-3 sm:py-6' : 'py-8'}`}>
         <div className="mx-auto max-w-6xl">
           <Outlet />
         </div>

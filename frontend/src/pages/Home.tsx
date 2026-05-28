@@ -96,7 +96,7 @@ const buildCitationCopyText = (citation: Citation, index: number) => {
 
 function MarkdownMessage({ content }: { content: string }) {
   return (
-    <div className="prose prose-stone max-w-none break-words prose-headings:font-serif prose-headings:text-ink-dark prose-p:text-ink-dark prose-strong:text-ink-dark prose-li:text-ink-dark prose-code:text-ink-dark prose-pre:overflow-x-auto prose-pre:bg-ink-dark prose-pre:text-white">
+    <div className="prose prose-stone max-w-none break-words text-sm prose-headings:font-serif prose-headings:text-ink-dark prose-p:text-ink-dark prose-strong:text-ink-dark prose-li:text-ink-dark prose-code:break-words prose-code:text-ink-dark prose-pre:overflow-x-auto prose-pre:bg-ink-dark prose-pre:text-white prose-table:block prose-table:overflow-x-auto md:text-base">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -136,32 +136,32 @@ function CitationCard({ citation, index }: { citation: Citation; index: number }
   };
 
   return (
-    <li className="rounded-2xl border border-ink-dark/10 bg-paper-bg/70 p-4 shadow-sm">
+    <li className="rounded-xl border border-ink-dark/10 bg-paper-bg/70 p-3 shadow-sm sm:rounded-2xl sm:p-4">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sdu-red/10 text-xs font-semibold text-sdu-red">
             {index + 1}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-ink-dark">{getCitationTitle(citation, index)}</p>
-          <p className={`mt-1.5 text-sm leading-6 text-ink-light ${expanded ? '' : 'line-clamp-2'}`}>
+          <p className="break-words text-sm font-semibold text-ink-dark">{getCitationTitle(citation, index)}</p>
+          <p className={`mt-1.5 break-words text-sm leading-6 text-ink-light ${expanded ? '' : 'line-clamp-2'}`}>
               {citation.snippet}
           </p>
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-ink-dark/10 pt-3">
-        <div className="flex flex-wrap gap-2">
+      <div className="mt-3 border-t border-ink-dark/10 pt-3">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <button
             type="button"
             onClick={() => setExpanded((current) => !current)}
-            className="rounded-full border border-ink-dark/10 px-3.5 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:px-3 sm:py-1 sm:text-xs"
+            className="rounded-full border border-ink-dark/10 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
           >
             {expanded ? '收起摘要' : '展开摘要'}
           </button>
           <button
             type="button"
             onClick={() => void handleCopy()}
-            className="rounded-full border border-ink-dark/10 px-3.5 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:px-3 sm:py-1 sm:text-xs"
+            className="rounded-full border border-ink-dark/10 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
           >
             {copied ? '已复制' : '复制摘录'}
           </button>
@@ -220,9 +220,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`w-full max-w-[92%] rounded-2xl px-4 py-3 md:max-w-[82%] ${
+        className={`min-w-0 w-full max-w-[96%] rounded-2xl px-3 py-3 sm:max-w-[92%] sm:px-4 md:max-w-[82%] ${
           isUser
             ? 'bg-sdu-red text-white shadow-sm'
             : 'border border-ink-dark/10 bg-white text-ink-dark shadow-sm'
@@ -234,7 +234,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         </div>
 
         {isUser ? (
-          <p className="whitespace-pre-wrap leading-7">{message.content}</p>
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 md:text-base md:leading-7">{message.content}</p>
         ) : (
           <>
             <MarkdownMessage content={message.content || (message.streaming ? '正在生成回答...' : '暂无内容')} />
@@ -466,29 +466,29 @@ export default function Home() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <section className="overflow-hidden rounded-3xl border border-ink-dark/10 bg-white/95 shadow-sm">
-        <div className="bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.08),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] px-6 py-7 md:px-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+    <div className="mx-auto w-full max-w-5xl space-y-4 overflow-x-hidden md:space-y-6">
+      <section className="overflow-hidden rounded-2xl border border-ink-dark/10 bg-white/95 shadow-sm md:rounded-3xl">
+        <div className="bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.08),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] px-4 py-4 sm:px-5 md:px-8 md:py-7">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-5">
             <div className="max-w-3xl">
-              <h1 className="text-3xl font-serif font-bold tracking-tight text-ink-dark md:text-4xl">AI 校史问答</h1>
-              <p className="mt-3 text-sm leading-6 text-ink-light md:text-base">{pageSummary}</p>
+              <h1 className="text-2xl font-serif font-bold tracking-tight text-ink-dark md:text-4xl">AI 校史问答</h1>
+              <p className="mt-2 text-sm leading-6 text-ink-light md:mt-3 md:text-base">{pageSummary}</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-3">
               {token ? (
                 <>
                   <button
                     type="button"
                     onClick={handleNewConversation}
                     disabled={isBusy}
-                    className="rounded-xl border border-ink-dark/15 px-4 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 md:px-4"
                   >
                     新对话
                   </button>
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="rounded-xl border border-ink-dark/15 px-4 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red"
+                    className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
                   >
                     退出登录
                   </button>
@@ -496,7 +496,7 @@ export default function Home() {
               ) : (
                 <Link
                   to="/login?next=/"
-                  className="rounded-xl bg-sdu-red px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover"
+                  className="col-span-2 rounded-xl bg-sdu-red px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover md:col-span-1"
                 >
                   登录后提问
                 </Link>
@@ -504,38 +504,39 @@ export default function Home() {
             </div>
           </div>
 
-          {notice ? <InlineNotice message={notice.message} type={notice.type} className="mt-5" /> : null}
+          {notice ? <InlineNotice message={notice.message} type={notice.type} className="mt-4 md:mt-5" /> : null}
 
-          <form onSubmit={handleSearch} className="mt-5 space-y-4">
+          <form onSubmit={handleSearch} className="mt-4 space-y-3 md:mt-5 md:space-y-4">
             <textarea
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="例如：山东大学的历史演变是怎样的？"
-              className="min-h-[120px] w-full rounded-2xl border border-ink-dark/15 bg-white px-4 py-3 text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100"
+              className="min-h-[92px] w-full resize-y rounded-xl border border-ink-dark/15 bg-white px-3.5 py-3 text-base text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100 md:min-h-[120px] md:rounded-2xl md:px-4"
               disabled={!token || isBusy}
             />
 
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap gap-2">
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setQuery(prompt)}
-                    className="rounded-full border border-ink-dark/10 bg-white px-3.5 py-2 text-sm text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+                    className="max-w-[82vw] shrink-0 truncate rounded-full border border-ink-dark/10 bg-white px-3.5 py-2 text-sm text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+                    title={prompt}
                   >
                     {prompt}
                   </button>
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3">
                 <button
                   type="button"
                   onClick={handleRetryLast}
                   disabled={!canRetry}
-                  className="rounded-xl border border-ink-dark/15 px-4 py-3 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60"
+                  className="min-w-0 rounded-xl border border-ink-dark/15 px-3 py-3 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
                 >
                   重试上一问
                 </button>
@@ -543,7 +544,7 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={handleAbort}
-                    className="rounded-xl border border-sdu-red/30 bg-sdu-red/5 px-4 py-3 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10"
+                    className="min-w-0 rounded-xl border border-sdu-red/30 bg-sdu-red/5 px-3 py-3 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10 sm:px-4"
                   >
                     停止生成
                   </button>
@@ -551,7 +552,7 @@ export default function Home() {
                 <button
                   type="submit"
                   disabled={!token || !query.trim() || isBusy}
-                  className="rounded-xl bg-sdu-red px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60"
+                  className="col-span-2 rounded-xl bg-sdu-red px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
                 >
                   {isBusy ? '生成中…' : '发送问题'}
                 </button>
@@ -559,46 +560,47 @@ export default function Home() {
             </div>
 
             {!token ? (
-              <div className="flex flex-col gap-3 rounded-2xl border border-ink-dark/10 bg-paper-bg/70 px-4 py-4 text-sm text-ink-light md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center justify-between gap-3 rounded-xl border border-ink-dark/10 bg-paper-bg/70 px-3.5 py-3 text-sm text-ink-light md:rounded-2xl md:px-4 md:py-4">
                 <p>请先登录后再使用问答。</p>
-                <Link to="/login?next=/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
+                <Link to="/login?next=/" className="shrink-0 font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
                   前往登录
                 </Link>
               </div>
             ) : (
-              <p className="text-sm text-ink-light">桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。</p>
+              <p className="text-xs leading-5 text-ink-light md:text-sm">桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。</p>
             )}
           </form>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-3xl border border-ink-dark/10 bg-white shadow-sm">
-        <div className="border-b border-ink-dark/10 px-5 py-4 md:px-6">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <section className="overflow-hidden rounded-2xl border border-ink-dark/10 bg-white shadow-sm md:rounded-3xl">
+        <div className="border-b border-ink-dark/10 px-4 py-3 md:px-6 md:py-4">
+          <div className="flex items-center justify-between gap-3 md:flex-row">
             <div>
-              <h2 className="font-serif text-xl font-bold text-ink-dark">对话记录</h2>
-              <p className="mt-1 text-sm text-ink-light">可查看最近的问答内容。</p>
+              <h2 className="font-serif text-lg font-bold text-ink-dark md:text-xl">对话记录</h2>
+              <p className="mt-1 hidden text-sm text-ink-light md:block">可查看最近的问答内容。</p>
             </div>
-            <p className="text-sm text-ink-light">
+            <p className="shrink-0 text-xs text-ink-light md:text-sm">
               {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '登录后开始提问'}
             </p>
           </div>
         </div>
 
-        <div className="max-h-none overflow-visible bg-paper-bg/60 px-4 py-5 md:max-h-[62vh] md:overflow-y-auto md:px-6">
+        <div className="max-h-none overflow-visible bg-paper-bg/60 px-3 py-4 md:max-h-[62vh] md:overflow-y-auto md:px-6 md:py-5">
           {messages.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-ink-dark/20 bg-white/80 p-8 text-center shadow-sm">
+            <div className="rounded-xl border border-dashed border-ink-dark/20 bg-white/80 p-5 text-center shadow-sm md:rounded-2xl md:p-8">
               <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '登录后即可开始问答'}</p>
-              <p className="mt-2 text-sm leading-6 text-ink-light">
+              <p className="mt-1.5 text-sm leading-6 text-ink-light md:mt-2">
                 {token ? '可直接输入问题开始。' : '登录后即可使用。'}
               </p>
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <div className="mt-4 flex justify-start gap-2 overflow-x-auto pb-1 md:mt-5 md:flex-wrap md:justify-center md:overflow-visible md:pb-0">
                 {token ? QUICK_PROMPTS.slice(0, 3).map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => setQuery(prompt)}
-                    className="rounded-full border border-ink-dark/10 bg-paper-bg px-3 py-1.5 text-sm text-ink-dark hover:border-sdu-red/30 hover:text-sdu-red"
+                    className="max-w-[76vw] shrink-0 truncate rounded-full border border-ink-dark/10 bg-paper-bg px-3 py-1.5 text-sm text-ink-dark hover:border-sdu-red/30 hover:text-sdu-red"
+                    title={prompt}
                   >
                     {prompt}
                   </button>
@@ -610,7 +612,7 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="min-w-0 space-y-3 md:space-y-4">
               {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
               <div ref={chatEndRef} />
             </div>
