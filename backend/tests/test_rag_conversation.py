@@ -128,7 +128,32 @@ def test_cross_user_conversation_forbidden(monkeypatch):
     conv_id = first.json()["conversation_id"]
 
     user_ref["value"] = user2
-    forbidden = client.post("/api/rag/query", json={"query": "Q2", "conversation_id": conv_id})
+    forbidden = client.post("/api/rag/query", json={"query": "Q2", "conversation_id": str(conv_id)})
+    assert forbidden.status_code == 403
+
+
+def test_guest_user_can_create_conversation_and_stays_isolated(monkeypatch):
+    client, db, _user1, user2, _prompts, user_ref = _build_test_client(monkeypatch)
+    guest = User(id=uuid.uuid4(), email="guest-rag@example.com", password_hash="x", role="guest", is_active=True)
+    db.add(guest)
+    db.commit()
+
+    user_ref["value"] = guest
+    resp = client.post("/api/rag/query", json={"query": "guest Q1"})
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["conversation_id"]
+    assert payload["answer"] == "answer-1"
+
+    conv_id = uuid.UUID(payload["conversation_id"])
+    conversation = db.get(Conversation, conv_id)
+    assert conversation.user_id == guest.id
+    messages = db.query(Message).filter(Message.conversation_id == conv_id).order_by(Message.created_at.asc()).all()
+    assert [message.role for message in messages] == ["user", "assistant"]
+    assert messages[0].content == "guest Q1"
+
+    user_ref["value"] = user2
+    forbidden = client.post("/api/rag/query", json={"query": "Q2", "conversation_id": str(conv_id)})
     assert forbidden.status_code == 403
 
 

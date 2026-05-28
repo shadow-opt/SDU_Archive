@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import InlineNotice from '../components/InlineNotice';
-import { apiBase, clearAuthToken, getAuthHeaders, getAuthToken, parseApiError } from '../services/api';
+import {
+  apiBase,
+  clearAuthToken,
+  clearQuizGuestToken,
+  ensureGuestQuizToken,
+  getAuthToken,
+  getQuizAuthHeaders,
+  getQuizAuthToken,
+  parseApiError,
+} from '../services/api';
 
 interface Citation {
   source: string;
@@ -253,6 +262,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
 export default function Home() {
   const [token, setToken] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(getAuthToken()));
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -261,19 +271,50 @@ export default function Home() {
   const [lastSubmittedQuery, setLastSubmittedQuery] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const navigate = useNavigate();
 
   const isBusy = requestState === 'submitting' || requestState === 'streaming';
   const canRetry = Boolean(token && lastSubmittedQuery && !isBusy);
 
   const pageSummary = useMemo(() => {
-    if (!token) return '登录后即可提问。';
+    if (!token) return '正在准备游客问答会话。';
     if (!messages.length) return '输入问题后即可开始。';
     return activeConversationId ? '当前对话进行中。' : '已准备好开始新对话。';
   }, [activeConversationId, messages.length, token]);
 
   useEffect(() => {
-    setToken(getAuthToken());
+    let cancelled = false;
+
+    const syncQuestionToken = async () => {
+      setIsLoggedIn(Boolean(getAuthToken()));
+      try {
+        const nextToken = await ensureGuestQuizToken();
+        if (!cancelled) {
+          setToken(nextToken);
+        }
+      } catch {
+        if (!cancelled) {
+          setToken(getQuizAuthToken());
+          setNotice({ message: '游客会话创建失败，请稍后重试。', type: 'error' });
+        }
+      }
+    };
+
+    void syncQuestionToken();
+
+    const handleFocus = () => {
+      void syncQuestionToken();
+    };
+    const handleStorage = () => {
+      void syncQuestionToken();
+    };
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -283,12 +324,18 @@ export default function Home() {
   const handleLogout = () => {
     abortRef.current?.abort();
     clearAuthToken();
-    setToken(null);
+    setIsLoggedIn(false);
     setActiveConversationId(null);
     setMessages([]);
     setLastSubmittedQuery('');
     setRequestState('idle');
     setNotice({ message: '已退出登录。', type: 'info' });
+    void ensureGuestQuizToken()
+      .then((nextToken) => setToken(nextToken))
+      .catch(() => {
+        setToken(null);
+        setNotice({ message: '已退出登录，游客会话创建失败，请稍后重试。', type: 'error' });
+      });
   };
 
   const handleNewConversation = () => {
@@ -309,11 +356,22 @@ export default function Home() {
 
   const submitQuery = useCallback(async (rawQuery: string, options?: { clearInput?: boolean }) => {
     const userQuery = rawQuery.trim();
-    if (!userQuery || !token) {
-      if (!token) {
-        setNotice({ message: '请先登录后再进行校史问答。', type: 'info' });
-        navigate('/login?next=/', { replace: false });
+    if (!userQuery) {
+      return;
+    }
+
+    let requestToken = token;
+    if (!requestToken) {
+      try {
+        requestToken = await ensureGuestQuizToken();
+        setToken(requestToken);
+      } catch {
+        setNotice({ message: '游客会话创建失败，请稍后重试。', type: 'error' });
+        return;
       }
+    }
+
+    if (!requestToken) {
       return;
     }
 
@@ -379,7 +437,7 @@ export default function Home() {
     try {
       const res = await fetch(`${apiBase}/api/rag/stream`, {
         method: 'POST',
-        headers: getAuthHeaders(true),
+        headers: getQuizAuthHeaders(true),
         body: JSON.stringify({
           query: userQuery,
           conversation_id: activeConversationId,
@@ -389,7 +447,12 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        throw new Error(await parseApiError(res, '查询失败，请稍后重试', { redirectOn401To: '/login?next=/' }));
+        if (res.status === 401) {
+          clearQuizGuestToken();
+          setToken(null);
+          setIsLoggedIn(Boolean(getAuthToken()));
+        }
+        throw new Error(await parseApiError(res, '查询失败，请稍后重试'));
       }
 
       const reader = res.body?.getReader();
@@ -440,7 +503,7 @@ export default function Home() {
       setRequestState((current) => (current === 'submitting' || current === 'streaming' ? 'idle' : current));
       abortRef.current = null;
     }
-  }, [activeConversationId, navigate, token]);
+  }, [activeConversationId, token]);
 
   const handleSearch = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -485,6 +548,7 @@ export default function Home() {
                   >
                     新对话
                   </button>
+                  {isLoggedIn ? (
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -492,13 +556,21 @@ export default function Home() {
                   >
                     退出登录
                   </button>
+                  ) : (
+                    <Link
+                      to="/login?next=/"
+                      className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-center text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
+                    >
+                      登录
+                    </Link>
+                  )}
                 </>
               ) : (
                 <Link
                   to="/login?next=/"
                   className="col-span-2 rounded-xl bg-sdu-red px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover md:col-span-1"
                 >
-                  登录后提问
+                  登录
                 </Link>
               )}
             </div>
@@ -559,16 +631,10 @@ export default function Home() {
               </div>
             </div>
 
-            {!token ? (
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-ink-dark/10 bg-paper-bg/70 px-3.5 py-3 text-sm text-ink-light md:rounded-2xl md:px-4 md:py-4">
-                <p>请先登录后再使用问答。</p>
-                <Link to="/login?next=/" className="shrink-0 font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
-                  前往登录
-                </Link>
-              </div>
-            ) : (
-              <p className="text-xs leading-5 text-ink-light md:text-sm">桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。</p>
-            )}
+            <p className="text-xs leading-5 text-ink-light md:text-sm">
+              桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。
+              {!isLoggedIn ? ' 当前以游客身份提问，登录后可切换为个人账号。' : ''}
+            </p>
           </form>
         </div>
       </section>
@@ -581,7 +647,7 @@ export default function Home() {
               <p className="mt-1 hidden text-sm text-ink-light md:block">可查看最近的问答内容。</p>
             </div>
             <p className="shrink-0 text-xs text-ink-light md:text-sm">
-              {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '登录后开始提问'}
+              {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '正在准备游客会话'}
             </p>
           </div>
         </div>
@@ -589,9 +655,9 @@ export default function Home() {
         <div className="max-h-none overflow-visible bg-paper-bg/60 px-3 py-4 md:max-h-[62vh] md:overflow-y-auto md:px-6 md:py-5">
           {messages.length === 0 ? (
             <div className="rounded-xl border border-dashed border-ink-dark/20 bg-white/80 p-5 text-center shadow-sm md:rounded-2xl md:p-8">
-              <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '登录后即可开始问答'}</p>
+              <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '正在准备游客会话'}</p>
               <p className="mt-1.5 text-sm leading-6 text-ink-light md:mt-2">
-                {token ? '可直接输入问题开始。' : '登录后即可使用。'}
+                {token ? '可直接输入问题开始。' : '准备完成后即可使用。'}
               </p>
               <div className="mt-4 flex justify-start gap-2 overflow-x-auto pb-1 md:mt-5 md:flex-wrap md:justify-center md:overflow-visible md:pb-0">
                 {token ? QUICK_PROMPTS.slice(0, 3).map((prompt) => (

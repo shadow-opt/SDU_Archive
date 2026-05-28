@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from backend.app import dashboard, quiz, rag
 from backend.app.deps import get_current_user, get_db, rate_limiter, require_admin
-from backend.app.models import AnswerRecord, QuizCollection, QuizQuestion, User, UserScore
+from backend.app.models import AnswerRecord, Conversation, Message, QuizCollection, QuizQuestion, User, UserScore
 
 
 def _build_test_client():
@@ -27,6 +27,8 @@ def _build_test_client():
 	QuizQuestion.__table__.create(bind=engine)
 	AnswerRecord.__table__.create(bind=engine)
 	UserScore.__table__.create(bind=engine)
+	Conversation.__table__.create(bind=engine)
+	Message.__table__.create(bind=engine)
 
 	db = SessionLocal()
 	user = User(id=uuid.uuid4(), email="quiz-user@example.com", password_hash="x", role="user", is_active=True)
@@ -239,12 +241,26 @@ def test_guest_session_can_answer_and_is_isolated():
 	assert user_summary.json()["total_answers"] == 0
 
 
-def test_guest_user_cannot_use_rag():
-	client, _db, _user, _admin, _collection, _q1, _q2, user_ref = _build_test_client()
+def test_guest_user_can_use_rag(monkeypatch):
+	client, db, _user, _admin, _collection, _q1, _q2, user_ref = _build_test_client()
 
-	user_ref["value"] = User(id=uuid.uuid4(), email="guest@example.com", password_hash="x", role="guest", is_active=True)
+	async def fake_embed_text(_query: str):
+		return [0.1] * 1536
+
+	def fake_retrieve(_db, _embedding, _top_k):
+		return []
+
+	monkeypatch.setattr(rag, "embed_text", fake_embed_text)
+	monkeypatch.setattr(rag, "_retrieve", fake_retrieve)
+
+	guest = User(id=uuid.uuid4(), email="guest@example.com", password_hash="x", role="guest", is_active=True)
+	db.add(guest)
+	db.commit()
+
+	user_ref["value"] = guest
 	response = client.post("/api/rag/query", json={"query": "山东大学"})
-	assert response.status_code == 403
+	assert response.status_code == 200
+	assert response.json()["answer"] == "暂无相关档案记载。"
 
 
 def test_question_update_recomputes_existing_scores():
