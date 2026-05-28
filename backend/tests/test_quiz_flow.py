@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.app import dashboard, quiz
+from backend.app import dashboard, quiz, rag
 from backend.app.deps import get_current_user, get_db, rate_limiter, require_admin
 from backend.app.models import AnswerRecord, QuizCollection, QuizQuestion, User, UserScore
 
@@ -70,6 +70,7 @@ def _build_test_client():
 	app = FastAPI()
 	app.include_router(quiz.router)
 	app.include_router(dashboard.router)
+	app.include_router(rag.router)
 
 	current_user_ref = {"value": user}
 
@@ -209,6 +210,41 @@ def test_submit_answer_updates_summary_and_history():
 	assert questions.status_code == 200
 	questions_payload = {item["id"]: item for item in questions.json()}
 	assert questions_payload[str(q1.id)]["answered"] is True
+
+
+def test_guest_session_can_answer_and_is_isolated():
+	client, db, user, _admin, collection, q1, _q2, user_ref = _build_test_client()
+
+	session_response = client.post("/api/quiz/guest-session")
+	assert session_response.status_code == 200
+	token_payload = session_response.json()
+	assert token_payload["access_token"]
+
+	guest = db.query(User).filter(User.role == "guest").first()
+	assert guest is not None
+	assert guest.email.endswith("@guest.quiz.sdu.edu.cn")
+
+	user_ref["value"] = guest
+	assert client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 1}).status_code == 200
+	duplicate = client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 1})
+	assert duplicate.status_code == 400
+
+	guest_summary = client.get(f"/api/quiz/collections/{collection.id}/summary")
+	assert guest_summary.status_code == 200
+	assert guest_summary.json()["total_answers"] == 1
+
+	user_ref["value"] = user
+	user_summary = client.get(f"/api/quiz/collections/{collection.id}/summary")
+	assert user_summary.status_code == 200
+	assert user_summary.json()["total_answers"] == 0
+
+
+def test_guest_user_cannot_use_rag():
+	client, _db, _user, _admin, _collection, _q1, _q2, user_ref = _build_test_client()
+
+	user_ref["value"] = User(id=uuid.uuid4(), email="guest@example.com", password_hash="x", role="guest", is_active=True)
+	response = client.post("/api/rag/query", json={"query": "山东大学"})
+	assert response.status_code == 403
 
 
 def test_question_update_recomputes_existing_scores():
@@ -494,26 +530,49 @@ def test_import_csv_returns_detailed_feedback():
 
 def test_collection_dashboard_supports_topic_metrics_and_filters():
 	client, _db, user, admin, collection, q1, q2, user_ref = _build_test_client()
+	guest = User(id=uuid.uuid4(), email="guest-dashboard@guest.quiz.sdu.edu.cn", password_hash="x", role="guest", is_active=True)
+	_db.add(guest)
+	_db.commit()
 
 	user_ref["value"] = admin
 	assert client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 1}).status_code == 200
 	assert client.post(f"/api/quiz/questions/{q2.id}/submit", json={"answer_index": 0}).status_code == 200
 	user_ref["value"] = user
 	assert client.post(f"/api/quiz/questions/{q1.id}/submit", json={"answer_index": 0}).status_code == 200
+	user_ref["value"] = guest
+	assert client.post(f"/api/quiz/questions/{q2.id}/submit", json={"answer_index": 2}).status_code == 200
 
 	dashboard_response = client.get(f"/api/admin/dashboard/quiz-collections?collection_id={collection.id}&days=30")
 	assert dashboard_response.status_code == 200
 	payload = dashboard_response.json()
 	assert payload["collection_id"] == str(collection.id)
 	assert payload["range_days"] == 30
+	assert payload["user_segment"] == "all"
 	assert len(payload["collections"]) == 1
 	stats = payload["collections"][0]
 	assert stats["collection_id"] == str(collection.id)
-	assert stats["participant_count"] == 2
+	assert stats["participant_count"] == 3
 	assert stats["completed_user_count"] == 1
-	assert stats["total_answers"] == 3
+	assert stats["total_answers"] == 4
 	assert stats["total_points_awarded"] == 2
-	assert stats["completion_rate"] == 50.0
-	assert stats["average_accuracy"] == 33.33
+	assert stats["completion_rate"] == 33.33
+	assert stats["average_accuracy"] == 25.0
 	assert payload["wrong_questions"][0]["collection_title"] == collection.title
 	assert payload["leaderboard"][0]["email"] == admin.email
+	assert payload["daily_trend"]
+	assert payload["daily_trend"][0]["guest_answers"] == 1
+	assert payload["daily_trend"][0]["registered_answers"] == 3
+	assert {item["segment"] for item in payload["segments"]} == {"guest", "registered"}
+
+	guest_response = client.get(f"/api/admin/dashboard/quiz-collections?collection_id={collection.id}&user_segment=guest")
+	assert guest_response.status_code == 200
+	guest_payload = guest_response.json()
+	assert guest_payload["collections"][0]["participant_count"] == 1
+	assert guest_payload["collections"][0]["total_answers"] == 1
+	assert guest_payload["leaderboard"][0]["role"] == "guest"
+
+	export_response = client.get(f"/api/admin/dashboard/quiz-collections/export?kind=leaderboard&collection_id={collection.id}&user_segment=guest")
+	assert export_response.status_code == 200
+	assert export_response.headers["content-type"].startswith("text/csv")
+	assert export_response.text.startswith("\ufeff")
+	assert "游客用户" in export_response.text

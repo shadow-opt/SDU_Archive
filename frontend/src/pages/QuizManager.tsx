@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { apiBase, getAuthHeaders, parseApiError } from '../services/api';
 import InlineNotice from '../components/InlineNotice';
 
@@ -390,6 +391,26 @@ export default function QuizManager() {
   });
 
   const selectedCollection = collections.find((collection) => collection.id === selectedCollectionId) ?? null;
+  const buildPublicQuizUrl = (collectionId: string) => `${window.location.origin}/quiz/${collectionId}`;
+  const copyQuizUrl = async (collection: QuizCollection) => {
+    try {
+      await navigator.clipboard.writeText(buildPublicQuizUrl(collection.id));
+      setNotice({ msg: `已复制「${collection.title}」扫码链接`, type: 'success' });
+    } catch {
+      setNotice({ msg: '复制失败，请手动复制链接', type: 'error' });
+    }
+  };
+  const downloadQrCode = (collection: QuizCollection) => {
+    const canvas = document.getElementById(`quiz-qr-${collection.id}`) as HTMLCanvasElement | null;
+    if (!canvas) {
+      setNotice({ msg: '二维码尚未生成，请稍后重试', type: 'error' });
+      return;
+    }
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = `quiz-${collection.title || collection.id}.png`;
+    link.click();
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-ink-dark/10 p-6">
@@ -462,6 +483,19 @@ export default function QuizManager() {
                 <div className="flex items-center gap-2 mt-3">
                   <button type="button" onClick={() => openEditCollectionDrawer(collection)} className="px-3 py-1.5 rounded-md bg-sdu-red text-white text-xs hover:bg-sdu-red-hover">编辑</button>
                   <button type="button" onClick={() => void deleteCollection(collection.id)} className="px-3 py-1.5 rounded-md border border-red-200 text-red-700 text-xs hover:bg-red-50">删除</button>
+                </div>
+                <div className="mt-3 rounded-lg border border-ink-dark/10 bg-paper-bg/40 p-3">
+                  <div className="flex items-center gap-3">
+                    <QRCodeCanvas id={`quiz-qr-${collection.id}`} value={buildPublicQuizUrl(collection.id)} size={72} marginSize={1} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-ink-dark">扫码答题入口</p>
+                      <p className="mt-1 truncate text-[11px] text-ink-light">{buildPublicQuizUrl(collection.id)}</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => void copyQuizUrl(collection)} className="px-2.5 py-1.5 rounded-md border border-ink-dark/20 bg-white text-xs hover:border-sdu-red">复制链接</button>
+                        <button type="button" onClick={() => downloadQrCode(collection)} className="px-2.5 py-1.5 rounded-md border border-ink-dark/20 bg-white text-xs hover:border-sdu-red">下载二维码</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

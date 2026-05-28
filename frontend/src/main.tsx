@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 
 import PublicLayout from './components/PublicLayout'
@@ -16,18 +16,7 @@ import RagChunks from './pages/RagChunks'
 import QuizManager from './pages/QuizManager'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminUsers from './pages/AdminUsers'
-
-function NotFound() {
-  return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center text-center">
-      <h1 className="text-6xl font-serif font-bold text-sdu-red mb-4">404</h1>
-      <p className="text-lg text-ink-light mb-8">页面不存在</p>
-      <Link to="/" className="px-5 py-2.5 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors">
-        返回首页
-      </Link>
-    </div>
-  );
-}
+import NotFound from './pages/NotFound'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

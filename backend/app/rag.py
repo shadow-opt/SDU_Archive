@@ -76,6 +76,11 @@ def _get_or_create_conversation(db: Session, user: User, conversation_id):
     return conversation
 
 
+def _reject_guest_user(user: User) -> None:
+    if user.role == "guest":
+        raise HTTPException(status_code=403, detail="游客身份仅可用于互动答题")
+
+
 def _load_recent_messages(db: Session, conversation_id, history_window: int) -> list[Message]:
     if history_window <= 0:
         return []
@@ -132,6 +137,7 @@ async def query_rag(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _reject_guest_user(current_user)
     started = time.perf_counter()
     request_id = getattr(request.state, "request_id", "")
     conversation = _get_or_create_conversation(db, current_user, payload.conversation_id)
@@ -249,6 +255,7 @@ async def query_rag_stream(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _reject_guest_user(current_user)
     started = time.perf_counter()
     request_id = getattr(request.state, "request_id", "")
     conversation = _get_or_create_conversation(db, current_user, payload.conversation_id)

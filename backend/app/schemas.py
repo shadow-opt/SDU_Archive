@@ -351,6 +351,7 @@ class WrongQuestionItem(BaseModel):
 class TopUserItem(BaseModel):
     user_id: uuid.UUID
     email: EmailStr
+    role: str = "user"
     total_points: int
     total_answers: int
 
@@ -388,14 +389,36 @@ class QuizCollectionWrongQuestionItem(BaseModel):
 class QuizCollectionLeaderboardItem(BaseModel):
     user_id: uuid.UUID
     email: EmailStr
+    role: str = "user"
     total_points: int
     total_answers: int
+    accuracy_rate: float
+
+
+class QuizCollectionTrendItem(BaseModel):
+    date: str
+    participant_count: int
+    total_answers: int
+    total_points_awarded: int
+    accuracy_rate: float
+    guest_answers: int
+    registered_answers: int
+
+
+class QuizCollectionSegmentItem(BaseModel):
+    segment: Literal["guest", "registered"]
+    participant_count: int
+    total_answers: int
+    total_points_awarded: int
     accuracy_rate: float
 
 
 class QuizCollectionDashboard(BaseModel):
     range_days: Optional[int] = None
     collection_id: Optional[uuid.UUID] = None
+    user_segment: Literal["all", "guest", "registered"] = "all"
     collections: List[QuizCollectionStatsItem]
     wrong_questions: List[QuizCollectionWrongQuestionItem]
     leaderboard: List[QuizCollectionLeaderboardItem]
+    daily_trend: List[QuizCollectionTrendItem]
+    segments: List[QuizCollectionSegmentItem]

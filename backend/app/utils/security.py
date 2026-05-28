@@ -18,7 +18,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+def create_access_token(user_id: uuid.UUID, role: str, expires_delta: timedelta | None = None) -> str:
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     payload = {"sub": str(user_id), "role": role, "exp": expire}
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")

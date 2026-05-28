@@ -59,6 +59,8 @@ def list_users(
         query = query.filter(User.email.ilike(f"%{escape_like(q.strip())}%"))
     if role:
         query = query.filter(User.role == role)
+    else:
+        query = query.filter(User.role != "guest")
     if is_active is not None:
         query = query.filter(User.is_active.is_(is_active))
 

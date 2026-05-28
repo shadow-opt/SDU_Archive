@@ -1,7 +1,13 @@
 export const apiBase = import.meta.env.VITE_API_BASE ?? '';
 
-export const getAuthToken = () => localStorage.getItem('token');
-export const clearAuthToken = () => localStorage.removeItem('token');
+const AUTH_TOKEN_KEY = 'token';
+const QUIZ_GUEST_TOKEN_KEY = 'guest_quiz_token';
+
+export const getAuthToken = () => localStorage.getItem(AUTH_TOKEN_KEY);
+export const clearAuthToken = () => localStorage.removeItem(AUTH_TOKEN_KEY);
+export const getQuizGuestToken = () => localStorage.getItem(QUIZ_GUEST_TOKEN_KEY);
+export const clearQuizGuestToken = () => localStorage.removeItem(QUIZ_GUEST_TOKEN_KEY);
+export const getQuizAuthToken = () => getAuthToken() || getQuizGuestToken();
 
 type ApiErrorOptions = {
   redirectOn401To?: string | null;
@@ -9,6 +15,11 @@ type ApiErrorOptions = {
 
 type ApiRequestOptions = RequestInit & ApiErrorOptions & {
   includeJsonContentType?: boolean;
+};
+
+type ApiRequestError = Error & {
+  info?: unknown;
+  status?: number;
 };
 
 const authErrorMessage = (status: number) => {
@@ -29,6 +40,32 @@ export const getAuthHeaders = (includeJsonContentType = true): Record<string, st
   return headers;
 };
 
+export const getQuizAuthHeaders = (includeJsonContentType = true): Record<string, string> => {
+  const token = getQuizAuthToken();
+  const headers: Record<string, string> = {};
+  if (includeJsonContentType) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
+export const ensureGuestQuizToken = async () => {
+  const existingToken = getQuizAuthToken();
+  if (existingToken) {
+    return existingToken;
+  }
+  const res = await fetch(`${apiBase}/api/quiz/guest-session`, { method: 'POST' });
+  if (!res.ok) {
+    throw new Error(await parseApiError(res, '游客会话创建失败'));
+  }
+  const data = (await res.json()) as { access_token: string };
+  localStorage.setItem(QUIZ_GUEST_TOKEN_KEY, data.access_token);
+  return data.access_token;
+};
+
 export const fetcher = async (url: string) => {
   const headers = getAuthHeaders(true);
 
@@ -42,10 +79,10 @@ export const fetcher = async (url: string) => {
         window.location.href = '/admin/login';
       }
     }
-    const error = new Error(authMessage ?? 'An error occurred while fetching the data.');
+    const error: ApiRequestError = new Error(authMessage ?? 'An error occurred while fetching the data.');
     // Attach extra info to the error object.
-    (error as any).info = await res.json().catch(() => ({}));
-    (error as any).status = res.status;
+    error.info = await res.json().catch(() => ({}));
+    error.status = res.status;
     throw error;
   }
   return res.json();
@@ -81,6 +118,36 @@ export const apiRequest = async <T>(url: string, options: ApiRequestOptions = {}
   });
 
   if (!res.ok) {
+    throw new Error(await parseApiError(res, fallback, { redirectOn401To }));
+  }
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  return res.json() as Promise<T>;
+};
+
+export const quizApiRequest = async <T>(url: string, options: ApiRequestOptions = {}, fallback = '请求失败'): Promise<T> => {
+  const {
+    includeJsonContentType = true,
+    redirectOn401To = null,
+    headers,
+    ...init
+  } = options;
+
+  const res = await fetch(`${apiBase}${url}`, {
+    ...init,
+    headers: {
+      ...getQuizAuthHeaders(includeJsonContentType),
+      ...(headers ?? {}),
+    },
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      clearQuizGuestToken();
+    }
     throw new Error(await parseApiError(res, fallback, { redirectOn401To }));
   }
 

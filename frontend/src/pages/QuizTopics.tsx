@@ -1,23 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
-import { getAuthToken } from '../services/api';
+import { ensureGuestQuizToken, getQuizAuthToken } from '../services/api';
 import { fetchQuizCollections, toQuizErrorMessage, type QuizCollection } from './quiz/shared';
 
 export default function QuizTopics() {
-  const token = getAuthToken();
+  const [quizToken, setQuizToken] = useState(() => getQuizAuthToken());
   const [collections, setCollections] = useState<QuizCollection[]>([]);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [reloadSeed, setReloadSeed] = useState(0);
 
   const reloadTopics = () => setReloadSeed((value) => value + 1);
 
   useEffect(() => {
-    if (!token) return;
     const controller = new AbortController();
-    setLoading(true);
-    void fetchQuizCollections(controller.signal)
+    void ensureGuestQuizToken()
+      .then((token) => {
+        setQuizToken(token);
+        setLoading(true);
+        return fetchQuizCollections(controller.signal);
+      })
       .then((data) => {
         setCollections(data);
         setNotice(null);
@@ -30,7 +33,7 @@ export default function QuizTopics() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [reloadSeed, token]);
+  }, [reloadSeed]);
 
   const totalQuestions = useMemo(
     () => collections.reduce((sum, collection) => sum + collection.question_count, 0),
@@ -44,18 +47,6 @@ export default function QuizTopics() {
     () => collections.reduce((sum, collection) => sum + collection.total_points, 0),
     [collections],
   );
-
-  if (!token) {
-    return (
-      <div className="max-w-2xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
-        <h2 className="text-2xl font-serif font-bold mb-3">互动答题</h2>
-        <p className="text-ink-light mb-6">答题需要先登录账号。</p>
-        <Link to="/" className="inline-flex px-5 py-2.5 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors">
-          返回首页登录
-        </Link>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -94,7 +85,7 @@ export default function QuizTopics() {
         </button>
       )}
 
-      {loading && <p className="text-sm text-ink-light">加载中...</p>}
+      {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
 
       {!loading && !collections.length && (
         <div className="bg-white border border-ink-dark/10 rounded-2xl p-8 text-center text-ink-light">

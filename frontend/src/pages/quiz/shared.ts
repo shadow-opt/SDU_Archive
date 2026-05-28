@@ -1,4 +1,4 @@
-import { apiRequest } from '../../services/api';
+import { quizApiRequest } from '../../services/api';
 
 export type QuizCollection = {
   id: string;
@@ -82,30 +82,29 @@ export const pickInitialQuestionId = (questions: Question[], historyMap: Map<str
   return nextUnanswered?.id ?? questions[0]?.id ?? '';
 };
 
-export const fetchQuizCollections = (signal?: AbortSignal) => apiRequest<QuizCollection[]>(
+export const fetchQuizCollections = (signal?: AbortSignal) => quizApiRequest<QuizCollection[]>(
   '/api/quiz/collections',
-  { redirectOn401To: '/', signal },
+  { signal },
   '专题加载失败',
 );
 
-export const fetchQuizQuestions = (collectionId: string, signal?: AbortSignal) => apiRequest<Question[]>(
+export const fetchQuizQuestions = (collectionId: string, signal?: AbortSignal) => quizApiRequest<Question[]>(
   `/api/quiz/collections/${collectionId}/questions`,
-  { redirectOn401To: '/', signal },
+  { signal },
   '题目加载失败',
 );
 
-export const fetchQuizSummary = (collectionId: string, signal?: AbortSignal) => apiRequest<QuizSummary>(
+export const fetchQuizSummary = (collectionId: string, signal?: AbortSignal) => quizApiRequest<QuizSummary>(
   `/api/quiz/collections/${collectionId}/summary`,
-  { redirectOn401To: '/', signal },
+  { signal },
   '答题记录加载失败',
 );
 
-export const submitQuizAnswer = (questionId: string, answerIndex: number) => apiRequest<SubmissionResult>(
+export const submitQuizAnswer = (questionId: string, answerIndex: number) => quizApiRequest<SubmissionResult>(
   `/api/quiz/questions/${questionId}/submit`,
   {
     method: 'POST',
     body: JSON.stringify({ answer_index: answerIndex }),
-    redirectOn401To: '/',
   },
   '提交失败',
 );

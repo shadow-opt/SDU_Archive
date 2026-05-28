@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
-import { getAuthToken } from '../services/api';
+import { ensureGuestQuizToken, getQuizAuthToken } from '../services/api';
 import {
   fetchQuizCollections,
   fetchQuizQuestions,
@@ -18,7 +18,7 @@ type LocationState = {
 };
 
 export default function QuizResults() {
-  const token = getAuthToken();
+  const [quizToken, setQuizToken] = useState(() => getQuizAuthToken());
   const location = useLocation();
   const { collectionId = '' } = useParams();
   const state = (location.state as LocationState | null) ?? null;
@@ -26,20 +26,24 @@ export default function QuizResults() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [reloadSeed, setReloadSeed] = useState(0);
 
   const reloadResultData = () => setReloadSeed((value) => value + 1);
 
   useEffect(() => {
-    if (!token || !collectionId) return;
+    if (!collectionId) return;
     const controller = new AbortController();
-    setLoading(true);
-    void Promise.all([
-      fetchQuizCollections(controller.signal),
-      fetchQuizQuestions(collectionId, controller.signal),
-      fetchQuizSummary(collectionId, controller.signal),
-    ])
+    void ensureGuestQuizToken()
+      .then((token) => {
+        setQuizToken(token);
+        setLoading(true);
+        return Promise.all([
+          fetchQuizCollections(controller.signal),
+          fetchQuizQuestions(collectionId, controller.signal),
+          fetchQuizSummary(collectionId, controller.signal),
+        ]);
+      })
       .then(([nextCollections, nextQuestions, nextSummary]) => {
         setCollections(nextCollections);
         setQuestions(nextQuestions);
@@ -57,24 +61,12 @@ export default function QuizResults() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [collectionId, reloadSeed, token]);
+  }, [collectionId, reloadSeed]);
 
   const selectedCollection = useMemo(
     () => collections.find((collection) => collection.id === collectionId) ?? null,
     [collectionId, collections],
   );
-
-  if (!token) {
-    return (
-      <div className="max-w-2xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
-        <h2 className="text-2xl font-serif font-bold mb-3">专题结果页</h2>
-        <p className="text-ink-light mb-6">查看结果需要先登录账号。</p>
-        <Link to="/" className="inline-flex px-5 py-2.5 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors">
-          返回首页登录
-        </Link>
-      </div>
-    );
-  }
 
   if (!loading && !selectedCollection && notice?.type !== 'error') {
     return (
@@ -142,7 +134,7 @@ export default function QuizResults() {
           重试加载
         </button>
       )}
-      {loading && <p className="text-sm text-ink-light">加载中...</p>}
+      {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="bg-white border border-ink-dark/10 rounded-2xl p-5">

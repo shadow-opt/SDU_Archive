@@ -1,5 +1,7 @@
 import csv
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 from io import StringIO
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -24,11 +26,14 @@ from .schemas import (
     QuizImportRowIssue,
     QuizUserSummary,
     SubmissionResult,
+    Token,
 )
+from .utils.security import create_access_token, get_password_hash
 
 router = APIRouter(prefix="/api/quiz", tags=["quiz"], dependencies=[Depends(rate_limiter)])
 
 DEFAULT_COLLECTION_TITLE = "默认题库"
+GUEST_EMAIL_DOMAIN = "guest.quiz.sdu.edu.cn"
 
 
 def _get_or_create_default_collection(db: Session) -> QuizCollection:
@@ -300,6 +305,22 @@ def _build_collection_out(collection: QuizCollection, question_count: int, answe
         created_at=collection.created_at,
         updated_at=collection.updated_at,
     )
+
+
+@router.post("/guest-session", response_model=Token)
+def create_guest_session(db: Session = Depends(get_db)):
+    guest_id = uuid.uuid4()
+    guest = User(
+        id=guest_id,
+        email=f"guest-{guest_id.hex}@{GUEST_EMAIL_DOMAIN}",
+        password_hash=get_password_hash(secrets.token_urlsafe(24)),
+        role="guest",
+        is_active=True,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(guest)
+    db.commit()
+    return Token(access_token=create_access_token(user_id=guest.id, role=guest.role, expires_delta=timedelta(days=180)))
 
 
 @router.get("/collections", response_model=list[QuizCollectionOut])
