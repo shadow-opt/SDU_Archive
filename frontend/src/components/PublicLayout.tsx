@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Outlet, Link } from 'react-router-dom';
+import { Outlet, Link, useLocation } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 import { getAuthToken } from '../services/api';
 
 export default function PublicLayout() {
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(getAuthToken()));
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
+  const isQuizRoute = location.pathname.startsWith('/quiz');
 
   useEffect(() => {
     const syncAuthState = () => setIsLoggedIn(Boolean(getAuthToken()));
@@ -61,7 +63,7 @@ export default function PublicLayout() {
         ) : null}
       </header>
 
-      <main className="flex-1 w-full px-4 py-8 sm:px-6 md:py-12">
+      <main className={`flex-1 w-full px-4 sm:px-6 md:py-12 ${isQuizRoute ? 'py-3 sm:py-6' : 'py-8'}`}>
         <div className="mx-auto max-w-6xl">
           <Outlet />
         </div>

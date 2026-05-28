@@ -103,12 +103,55 @@ export default function QuizPlay() {
   const answeredCount = summary?.total_answers ?? 0;
   const totalQuestions = summary?.total_questions ?? questions.length;
   const remainingCount = Math.max(totalQuestions - answeredCount, 0);
+  const progressPercent = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
+
+  const renderActionControls = () => (
+    selectedHistory ? (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {nextUnansweredQuestion ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedQuestionId(nextUnansweredQuestion.id);
+              setSelectedOption(null);
+              setLastSubmission(null);
+              setNotice(null);
+            }}
+            className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
+          >
+            继续下一题
+          </button>
+        ) : (
+          <Link
+            to={`/quiz/${collectionId}/result`}
+            className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
+          >
+            查看完整结果
+          </Link>
+        )}
+        <Link
+          to={`/quiz/${collectionId}/result`}
+          className="rounded-lg border border-ink-dark/20 bg-white px-4 py-3 text-center font-medium hover:border-sdu-red"
+        >
+          {nextUnansweredQuestion ? '查看结果页' : '返回结果页'}
+        </Link>
+      </div>
+    ) : (
+      <button
+        type="submit"
+        disabled={loading || !selectedQuestion || selectedOption === null || submitting}
+        className="w-full rounded-lg bg-sdu-red py-3 font-medium text-white hover:bg-sdu-red-hover disabled:opacity-50"
+      >
+        {submitting ? '提交中...' : '提交答案'}
+      </button>
+    )
+  );
 
   const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedQuestion || selectedOption === null) return;
     setSubmitting(true);
-    setNotice({ msg: '提交中...', type: 'info' });
+    setNotice(null);
     try {
       const result = await submitQuizAnswer(selectedQuestion.id, selectedOption);
       const [nextQuestions, nextSummary] = await Promise.all([
@@ -120,10 +163,7 @@ export default function QuizPlay() {
       setSelectedQuestionId(result.question_id);
       setSelectedOption(null);
       setLastSubmission(result);
-      setNotice({
-        msg: result.correct ? `回答正确，获得 ${result.awarded} 分。` : '已提交，本题回答错误。',
-        type: result.correct ? 'success' : 'info',
-      });
+      setNotice(null);
     } catch (error) {
       const message = toQuizErrorMessage(error, '提交失败，请稍后重试');
       if (message.includes('你已经提交过这道题')) {
@@ -162,8 +202,38 @@ export default function QuizPlay() {
   }
 
   return (
-    <div className="space-y-4 overflow-x-hidden sm:space-y-6">
-      <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6 md:p-8">
+    <div className="space-y-3 overflow-x-hidden pb-24 sm:space-y-6 md:pb-0">
+      <div className="rounded-xl border border-ink-dark/10 bg-white p-3 shadow-sm md:hidden">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-sdu-red">互动答题</p>
+            <h1 className="mt-1 line-clamp-2 text-lg font-serif font-bold leading-snug text-ink-dark">{selectedCollection?.title ?? '专题作答'}</h1>
+          </div>
+          <div className="flex shrink-0 gap-2 text-xs">
+            <Link to="/quiz" className="rounded-md border border-ink-dark/15 px-2.5 py-1.5 text-ink-dark">专题</Link>
+            {collectionId && <Link to={`/quiz/${collectionId}/result`} className="rounded-md bg-sdu-red px-2.5 py-1.5 text-white">结果</Link>}
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+          <div className="rounded-lg bg-paper-bg/70 px-3 py-2">
+            <p className="text-ink-light">积分</p>
+            <p className="mt-0.5 font-semibold text-sdu-red">{summary?.total_points ?? 0}</p>
+          </div>
+          <div className="rounded-lg bg-paper-bg/70 px-3 py-2">
+            <p className="text-ink-light">进度</p>
+            <p className="mt-0.5 font-semibold text-ink-dark">{answeredCount}/{totalQuestions}</p>
+          </div>
+          <div className="rounded-lg bg-paper-bg/70 px-3 py-2">
+            <p className="text-ink-light">剩余</p>
+            <p className="mt-0.5 font-semibold text-ink-dark">{remainingCount}</p>
+          </div>
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-100">
+          <div className="h-full rounded-full bg-sdu-red transition-all" style={{ width: `${progressPercent}%` }} />
+        </div>
+      </div>
+
+      <div className="hidden rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6 md:block md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="mb-2 text-sm uppercase tracking-[0.12em] text-sdu-red sm:tracking-[0.2em]">互动答题 / 作答页</p>
@@ -193,7 +263,7 @@ export default function QuizPlay() {
       )}
       {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="hidden grid-cols-1 gap-4 md:grid md:grid-cols-3">
         <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5">
           <p className="text-sm text-ink-light mb-2">累计积分</p>
           <p className="text-2xl font-bold text-sdu-red sm:text-3xl">{summary?.total_points ?? 0}</p>
@@ -208,7 +278,7 @@ export default function QuizPlay() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-3 sm:gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="hidden h-fit rounded-2xl border border-ink-dark/10 bg-white p-5 xl:block">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="text-xl font-serif font-bold">题目导航</h2>
@@ -246,12 +316,15 @@ export default function QuizPlay() {
           </div>
         </aside>
 
-        <section className="min-w-0 rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5 md:p-8">
-          <form onSubmit={onSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-ink-dark mb-2">当前题目</label>
+        <section className="min-w-0 rounded-xl border border-ink-dark/10 bg-white p-3 shadow-sm sm:p-5 md:rounded-2xl md:p-8">
+          <form id="quiz-answer-form" onSubmit={onSubmit} className="space-y-4 md:space-y-6">
+            <div className="rounded-xl border border-ink-dark/10 bg-paper-bg/40 p-3 md:border-0 md:bg-transparent md:p-0">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <label className="block text-sm font-medium text-ink-dark">切换题目</label>
+                <span className="text-xs text-ink-light">已答 {answeredCount}/{totalQuestions}</span>
+              </div>
               <select
-                className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
+                className="w-full rounded-lg border border-ink-dark/20 bg-white px-3 py-2.5 text-sm md:px-4 md:py-3"
                 value={selectedQuestionId}
                 onChange={(event) => {
                   setSelectedQuestionId(event.target.value);
@@ -271,19 +344,19 @@ export default function QuizPlay() {
             </div>
 
             {selectedQuestion && (
-              <div className="space-y-4 rounded-xl border border-ink-dark/10 bg-paper-bg/40 p-4 sm:p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <h2 className="text-lg font-semibold text-ink-dark sm:text-xl">{selectedQuestion.prompt}</h2>
-                  <span className={selectedHistory ? 'text-xs rounded-full px-3 py-1 bg-green-100 text-green-700' : 'text-xs rounded-full px-3 py-1 bg-sdu-red/10 text-sdu-red'}>
+              <div className="space-y-3 rounded-xl border border-ink-dark/10 bg-white p-3 md:space-y-4 md:bg-paper-bg/40 md:p-5">
+                <div className="flex flex-wrap items-start justify-between gap-2 md:gap-3">
+                  <h2 className="text-lg font-semibold leading-relaxed text-ink-dark sm:text-xl">{selectedQuestion.prompt}</h2>
+                  <span className={selectedHistory ? 'rounded-full bg-green-100 px-2.5 py-1 text-xs text-green-700' : 'rounded-full bg-sdu-red/10 px-2.5 py-1 text-xs text-sdu-red'}>
                     {selectedHistory ? '已作答' : '待作答'}
                   </span>
                 </div>
-                <p className="text-sm text-ink-light">本题分值：{selectedQuestion.points}</p>
+                <p className="text-xs text-ink-light md:text-sm">本题分值：{selectedQuestion.points}</p>
 
                 {lastSubmission?.question_id === selectedQuestion.id && (
                   <div
                     className={[
-                      'rounded-xl border px-4 py-3 text-sm',
+                      'rounded-xl border px-3 py-3 text-sm md:px-4',
                       lastSubmission.correct ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900',
                     ].join(' ')}
                   >
@@ -297,7 +370,7 @@ export default function QuizPlay() {
                   </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5 md:space-y-3">
                   {selectedQuestion.options.map((option, index) => {
                     const checked = selectedOption === index;
                     const isCorrectOption = selectedHistory?.correct_index === index;
@@ -307,7 +380,7 @@ export default function QuizPlay() {
                         <div
                           key={index}
                           className={[
-                            'flex items-start gap-3 rounded-lg border px-4 py-3',
+                            'flex min-h-[54px] items-start gap-2.5 rounded-xl border px-3 py-3 md:gap-3 md:px-4',
                             isCorrectOption
                               ? 'border-green-200 bg-green-50 text-green-900'
                               : isSelectedInHistory
@@ -323,15 +396,18 @@ export default function QuizPlay() {
                       );
                     }
                     return (
-                      <label key={index} className="flex cursor-pointer items-start gap-3 rounded-lg border border-ink-dark/10 bg-white px-4 py-3 hover:border-sdu-red/40">
+                      <label key={index} className="flex min-h-[56px] cursor-pointer items-start gap-3 rounded-xl border border-ink-dark/10 bg-white px-3 py-3.5 hover:border-sdu-red/40 md:px-4">
                         <input
                           type="radio"
                           name="quiz-option"
                           checked={checked}
                           onChange={() => setSelectedOption(index)}
                           disabled={submitting}
-                          className="mt-1"
+                          className="mt-1 h-4 w-4 shrink-0 accent-sdu-red"
                         />
+                        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-paper-bg text-xs font-semibold text-ink-light">
+                          {String.fromCharCode(65 + index)}
+                        </span>
                         <span className="min-w-0 break-words">{option}</span>
                       </label>
                     );
@@ -340,45 +416,10 @@ export default function QuizPlay() {
               </div>
             )}
 
-            {selectedHistory ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {nextUnansweredQuestion ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedQuestionId(nextUnansweredQuestion.id);
-                      setSelectedOption(null);
-                      setLastSubmission(null);
-                      setNotice(null);
-                    }}
-                    className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
-                  >
-                    继续下一题
-                  </button>
-                ) : (
-                  <Link
-                    to={`/quiz/${collectionId}/result`}
-                    className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
-                  >
-                    查看完整结果
-                  </Link>
-                )}
-                <Link
-                  to={`/quiz/${collectionId}/result`}
-                  className="rounded-lg border border-ink-dark/20 px-4 py-3 text-center font-medium hover:border-sdu-red"
-                >
-                  {nextUnansweredQuestion ? '查看结果页' : '返回结果页'}
-                </Link>
-              </div>
-            ) : (
-              <button
-                type="submit"
-                disabled={loading || !selectedQuestion || selectedOption === null || submitting}
-                className="w-full rounded-lg bg-sdu-red py-3 font-medium text-white hover:bg-sdu-red-hover disabled:opacity-50"
-              >
-                {submitting ? '提交中...' : '提交答案'}
-              </button>
-            )}
+            <div className="hidden md:block">{renderActionControls()}</div>
+            <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-dark/10 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
+              <div className="mx-auto max-w-6xl">{renderActionControls()}</div>
+            </div>
           </form>
         </section>
       </div>
