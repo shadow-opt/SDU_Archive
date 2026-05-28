@@ -156,17 +156,17 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+    <div className="space-y-4 overflow-x-hidden sm:space-y-6">
+      <section className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-ink-light">互动答题运营</p>
-            <h1 className="mt-1 text-2xl font-serif font-bold text-ink-dark">答题统计大盘</h1>
+            <h1 className="mt-1 text-xl font-serif font-bold text-ink-dark sm:text-2xl">答题统计大盘</h1>
             <p className="mt-2 text-sm text-ink-light">
               {selectedCollection ? `当前查看：${selectedCollection.title}` : '全专题总览'}
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-5 xl:min-w-[760px]">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 xl:min-w-[760px]">
             <select value={rangeDays} onChange={(event) => setRangeDays(event.target.value)} className="rounded-lg border border-ink-dark/20 bg-white px-3 py-2 text-sm">
               <option value="all">全部时间</option>
               <option value="1">近 1 天</option>
@@ -174,7 +174,7 @@ export default function AdminDashboard() {
               <option value="30">近 30 天</option>
               <option value="90">近 90 天</option>
             </select>
-            <select value={selectedCollectionId} onChange={(event) => setSelectedCollectionId(event.target.value)} className="rounded-lg border border-ink-dark/20 bg-white px-3 py-2 text-sm md:col-span-2">
+            <select value={selectedCollectionId} onChange={(event) => setSelectedCollectionId(event.target.value)} className="rounded-lg border border-ink-dark/20 bg-white px-3 py-2 text-sm sm:col-span-2 lg:col-span-2">
               <option value="all">全部专题</option>
               {(collections ?? []).map((collection) => (
                 <option key={collection.id} value={collection.id}>{collection.title}</option>
@@ -209,16 +209,16 @@ export default function AdminDashboard() {
               { label: '平均正确率', value: formatPercent(totals.weightedAccuracy), hint: '按答题数加权' },
               { label: '发放积分', value: formatNumber(totals.totalPoints), hint: '答对题目累计' },
             ].map((item) => (
-              <article key={item.label} className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+              <article key={item.label} className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
                 <p className="text-sm text-ink-light">{item.label}</p>
-                <p className="mt-3 text-3xl font-bold text-sdu-red">{item.value}</p>
+                <p className="mt-2 text-2xl font-bold text-sdu-red sm:mt-3 sm:text-3xl">{item.value}</p>
                 <p className="mt-2 text-xs text-ink-light">{item.hint}</p>
               </article>
             ))}
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <article className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+          <section className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <article className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-serif font-bold">每日趋势</h2>
@@ -229,7 +229,7 @@ export default function AdminDashboard() {
                   <span>正确率</span>
                 </div>
               </div>
-              <div className="h-80">
+              <div className="h-60 sm:h-72 lg:h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.daily_trend} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -246,7 +246,7 @@ export default function AdminDashboard() {
               {!data.daily_trend.length && <p className="py-6 text-center text-sm text-ink-light">当前筛选暂无趋势数据</p>}
             </article>
 
-            <aside className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+            <aside className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-serif font-bold">用户类型</h2>
               <p className="mt-1 text-sm text-ink-light">游客与实名用户对比</p>
               <div className="mt-5 space-y-5">
@@ -259,7 +259,7 @@ export default function AdminDashboard() {
                     <div className="h-2 rounded-full bg-gray-100">
                       <div className="h-2 rounded-full bg-sdu-red" style={{ width: `${Math.max(4, (item.total_answers / segmentMax) * 100)}%` }} />
                     </div>
-                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-ink-light">
+                    <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-ink-light sm:grid-cols-3 sm:gap-2">
                       <span>参与 {formatNumber(item.participant_count)}</span>
                       <span>积分 {formatNumber(item.total_points_awarded)}</span>
                       <span>正确率 {formatPercent(item.accuracy_rate)}</span>
@@ -270,18 +270,19 @@ export default function AdminDashboard() {
             </aside>
           </section>
 
-          <section className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+          <section className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-serif font-bold">专题运营</h2>
                 <p className="text-sm text-ink-light">参与人数、完成率、得分与正确率</p>
               </div>
-              <button type="button" onClick={() => void exportCsv('collections')} className="rounded-lg border border-ink-dark/20 px-3 py-2 text-sm hover:border-sdu-red" disabled={exporting === 'collections'}>
+              <button type="button" onClick={() => void exportCsv('collections')} className="w-full rounded-lg border border-ink-dark/20 px-3 py-2 text-sm hover:border-sdu-red sm:w-auto" disabled={exporting === 'collections'}>
                 {exporting === 'collections' ? '导出中...' : '导出专题 CSV'}
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <p className="mb-2 text-xs text-ink-light sm:hidden">左右滑动查看完整表格</p>
+            <div className="overflow-x-auto rounded-lg border border-ink-dark/10">
+              <table className="min-w-[720px] text-sm">
                 <thead className="bg-gray-50 text-left text-ink-light">
                   <tr>
                     <th className="px-3 py-3">专题</th>
@@ -318,19 +319,20 @@ export default function AdminDashboard() {
             </div>
           </section>
 
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <article className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+          <section className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+            <article className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-serif font-bold">错题诊断</h2>
                   <p className="text-sm text-ink-light">优先处理答错次数高、正确率低的题目</p>
                 </div>
-                <button type="button" onClick={() => void exportCsv('wrong_questions')} className="rounded-lg border border-ink-dark/20 px-3 py-2 text-sm hover:border-sdu-red" disabled={exporting === 'wrong_questions'}>
+                <button type="button" onClick={() => void exportCsv('wrong_questions')} className="w-full rounded-lg border border-ink-dark/20 px-3 py-2 text-sm hover:border-sdu-red sm:w-auto" disabled={exporting === 'wrong_questions'}>
                   {exporting === 'wrong_questions' ? '导出中...' : '导出错题'}
                 </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+              <p className="mb-2 text-xs text-ink-light sm:hidden">左右滑动查看完整表格</p>
+              <div className="overflow-x-auto rounded-lg border border-ink-dark/10">
+                <table className="min-w-[560px] text-sm">
                   <thead className="bg-gray-50 text-left text-ink-light">
                     <tr>
                       <th className="px-3 py-3">题目</th>
@@ -361,13 +363,13 @@ export default function AdminDashboard() {
               </div>
             </article>
 
-            <article className="rounded-xl border border-ink-dark/10 bg-white p-5 shadow-sm">
+            <article className="rounded-xl border border-ink-dark/10 bg-white p-4 shadow-sm sm:p-5">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-serif font-bold">排行榜</h2>
                   <p className="text-sm text-ink-light">按积分和答题数排序</p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid w-full grid-cols-1 gap-2 sm:w-auto sm:grid-cols-2">
                   <select value={leaderboardLimit} onChange={(event) => setLeaderboardLimit(event.target.value)} className="rounded-lg border border-ink-dark/20 bg-white px-3 py-2 text-sm">
                     <option value="10">Top 10</option>
                     <option value="30">Top 30</option>
@@ -378,7 +380,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </div>
-              <div className="mb-4 h-52">
+              <div className="mb-4 h-44 sm:h-52">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.leaderboard.slice(0, 10)} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
@@ -389,8 +391,9 @@ export default function AdminDashboard() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
+              <p className="mb-2 text-xs text-ink-light sm:hidden">左右滑动查看完整表格</p>
+              <div className="overflow-x-auto rounded-lg border border-ink-dark/10">
+                <table className="min-w-[560px] text-sm">
                   <thead className="bg-gray-50 text-left text-ink-light">
                     <tr>
                       <th className="px-3 py-3">用户</th>

@@ -119,10 +119,10 @@ export default function QuizPlay() {
 
   if (!loading && !selectedCollection && notice?.type !== 'error') {
     return (
-      <div className="max-w-3xl mx-auto bg-white border border-ink-dark/10 rounded-2xl p-8 text-center">
+      <div className="mx-auto max-w-3xl rounded-2xl border border-ink-dark/10 bg-white p-6 text-center sm:p-8">
         <h2 className="text-2xl font-serif font-bold mb-3">专题不存在</h2>
         <p className="text-ink-light mb-6">请返回专题列表重新选择。</p>
-        <Link to="/quiz" className="inline-flex px-5 py-2.5 bg-sdu-red text-white rounded-lg hover:bg-sdu-red-hover transition-colors">
+        <Link to="/quiz" className="inline-flex w-full justify-center rounded-lg bg-sdu-red px-5 py-2.5 text-white transition-colors hover:bg-sdu-red-hover sm:w-auto">
           返回专题列表
         </Link>
       </div>
@@ -130,18 +130,18 @@ export default function QuizPlay() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white border border-ink-dark/10 rounded-2xl p-6 md:p-8">
+    <div className="space-y-4 overflow-x-hidden sm:space-y-6">
+      <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6 md:p-8">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-sdu-red mb-2">互动答题 / 作答页</p>
-            <h1 className="text-3xl font-serif font-bold text-ink-dark mb-3">{selectedCollection?.title ?? '专题作答'}</h1>
+          <div className="min-w-0">
+            <p className="mb-2 text-sm uppercase tracking-[0.12em] text-sdu-red sm:tracking-[0.2em]">互动答题 / 作答页</p>
+            <h1 className="mb-3 text-2xl font-serif font-bold text-ink-dark sm:text-3xl">{selectedCollection?.title ?? '专题作答'}</h1>
             <p className="text-ink-light max-w-3xl">{selectedCollection?.description || '选择题目并提交答案。'}</p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/quiz" className="px-4 py-2.5 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors">返回专题列表</Link>
+          <div className="grid w-full grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
+            <Link to="/quiz" className="rounded-lg border border-ink-dark/20 px-4 py-2.5 text-center transition-colors hover:border-sdu-red">返回专题列表</Link>
             {collectionId && (
-              <Link to={`/quiz/${collectionId}/result`} className="px-4 py-2.5 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover transition-colors">
+              <Link to={`/quiz/${collectionId}/result`} className="rounded-lg bg-sdu-red px-4 py-2.5 text-center text-white transition-colors hover:bg-sdu-red-hover">
                 查看结果页
               </Link>
             )}
@@ -154,7 +154,7 @@ export default function QuizPlay() {
         <button
           type="button"
           onClick={reloadQuizData}
-          className="px-4 py-2 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors"
+          className="w-full rounded-lg border border-ink-dark/20 px-4 py-2 transition-colors hover:border-sdu-red sm:w-auto"
         >
           重试加载
         </button>
@@ -162,22 +162,22 @@ export default function QuizPlay() {
       {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-5">
+        <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5">
           <p className="text-sm text-ink-light mb-2">累计积分</p>
-          <p className="text-3xl font-bold text-sdu-red">{summary?.total_points ?? 0}</p>
+          <p className="text-2xl font-bold text-sdu-red sm:text-3xl">{summary?.total_points ?? 0}</p>
         </div>
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-5">
+        <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5">
           <p className="text-sm text-ink-light mb-2">答题进度</p>
-          <p className="text-3xl font-bold text-ink-dark">{answeredCount}/{totalQuestions}</p>
+          <p className="text-2xl font-bold text-ink-dark sm:text-3xl">{answeredCount}/{totalQuestions}</p>
         </div>
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-5">
+        <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5">
           <p className="text-sm text-ink-light mb-2">剩余未答</p>
-          <p className="text-3xl font-bold text-ink-dark">{remainingCount}</p>
+          <p className="text-2xl font-bold text-ink-dark sm:text-3xl">{remainingCount}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6">
-        <aside className="bg-white border border-ink-dark/10 rounded-2xl p-5 h-fit">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="hidden h-fit rounded-2xl border border-ink-dark/10 bg-white p-5 xl:block">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h2 className="text-xl font-serif font-bold">题目导航</h2>
             <span className="text-xs text-ink-light">共 {questions.length} 题</span>
@@ -213,7 +213,7 @@ export default function QuizPlay() {
           </div>
         </aside>
 
-        <section className="bg-white border border-ink-dark/10 rounded-2xl p-5 md:p-8">
+        <section className="min-w-0 rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5 md:p-8">
           <form onSubmit={onSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-ink-dark mb-2">当前题目</label>
@@ -237,9 +237,9 @@ export default function QuizPlay() {
             </div>
 
             {selectedQuestion && (
-              <div className="border border-ink-dark/10 rounded-xl p-5 bg-paper-bg/40 space-y-4">
+              <div className="space-y-4 rounded-xl border border-ink-dark/10 bg-paper-bg/40 p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <h2 className="text-xl font-semibold text-ink-dark">{selectedQuestion.prompt}</h2>
+                  <h2 className="text-lg font-semibold text-ink-dark sm:text-xl">{selectedQuestion.prompt}</h2>
                   <span className={selectedHistory ? 'text-xs rounded-full px-3 py-1 bg-green-100 text-green-700' : 'text-xs rounded-full px-3 py-1 bg-sdu-red/10 text-sdu-red'}>
                     {selectedHistory ? '已作答' : '待作答'}
                   </span>
@@ -267,12 +267,12 @@ export default function QuizPlay() {
                           <span className="mt-0.5 text-xs font-semibold">
                             {isCorrectOption ? '正确答案' : isSelectedInHistory ? '你的选择' : `选项 ${index + 1}`}
                           </span>
-                          <span>{option}</span>
+                          <span className="min-w-0 break-words">{option}</span>
                         </div>
                       );
                     }
                     return (
-                      <label key={index} className="flex items-start gap-3 cursor-pointer rounded-lg border border-ink-dark/10 px-4 py-3 bg-white hover:border-sdu-red/40">
+                      <label key={index} className="flex cursor-pointer items-start gap-3 rounded-lg border border-ink-dark/10 bg-white px-4 py-3 hover:border-sdu-red/40">
                         <input
                           type="radio"
                           name="quiz-option"
@@ -281,7 +281,7 @@ export default function QuizPlay() {
                           disabled={submitting}
                           className="mt-1"
                         />
-                        <span>{option}</span>
+                        <span className="min-w-0 break-words">{option}</span>
                       </label>
                     );
                   })}

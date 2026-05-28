@@ -49,12 +49,12 @@ export default function QuizTopics() {
   );
 
   return (
-    <div className="space-y-6">
-      <section className="bg-white border border-ink-dark/10 rounded-2xl p-6 md:p-8">
-        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-sdu-red mb-3">专题列表</p>
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-ink-dark mb-3">互动答题</h1>
+    <div className="space-y-4 overflow-x-hidden sm:space-y-6">
+      <section className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6 md:p-8">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between md:gap-6">
+          <div className="min-w-0">
+            <p className="mb-3 text-sm uppercase tracking-[0.12em] text-sdu-red sm:tracking-[0.2em]">专题列表</p>
+            <h1 className="mb-3 text-2xl font-serif font-bold text-ink-dark sm:text-3xl md:text-4xl">互动答题</h1>
             <p className="text-ink-light max-w-2xl">选择专题开始作答！</p>
           </div>
           <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3 md:min-w-0 md:w-auto">
@@ -88,7 +88,7 @@ export default function QuizTopics() {
       {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
 
       {!loading && !collections.length && (
-        <div className="bg-white border border-ink-dark/10 rounded-2xl p-8 text-center text-ink-light">
+        <div className="rounded-2xl border border-ink-dark/10 bg-white p-6 text-center text-ink-light sm:p-8">
           暂无可用专题。
         </div>
       )}
@@ -101,9 +101,9 @@ export default function QuizTopics() {
               : 0;
             const completed = collection.question_count > 0 && collection.answered_count >= collection.question_count;
             return (
-              <article key={collection.id} className="bg-white border border-ink-dark/10 rounded-2xl p-6 flex flex-col gap-4">
+              <article key={collection.id} className="flex flex-col gap-4 rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="text-xl font-serif font-bold text-ink-dark">{collection.title}</h2>
                     <p className="text-sm text-ink-light mt-2 line-clamp-3">{collection.description || '暂无专题说明'}</p>
                   </div>
@@ -130,16 +130,16 @@ export default function QuizTopics() {
                   </div>
                 </div>
 
-                <div className="mt-auto flex flex-wrap gap-3">
+                <div className="mt-auto grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Link
                     to={`/quiz/${collection.id}`}
-                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg bg-sdu-red px-4 py-2.5 text-white transition-colors hover:bg-sdu-red-hover"
                   >
                     {collection.answered_count > 0 ? '继续作答' : '开始作答'}
                   </Link>
                   <Link
                     to={`/quiz/${collection.id}/result`}
-                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg border border-ink-dark/20 hover:border-sdu-red transition-colors"
+                    className="inline-flex items-center justify-center rounded-lg border border-ink-dark/20 px-4 py-2.5 transition-colors hover:border-sdu-red"
                   >
                     查看结果
                   </Link>

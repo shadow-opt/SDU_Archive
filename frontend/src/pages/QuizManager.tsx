@@ -413,25 +413,25 @@ export default function QuizManager() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-ink-dark/10 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 className="text-2xl font-serif font-bold">互动题库 CMS</h2>
-        <div className="flex items-center gap-2">
+    <div className="overflow-x-hidden rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-6">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <h2 className="text-xl font-serif font-bold sm:text-2xl">互动题库 CMS</h2>
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:w-auto lg:flex lg:items-center">
           <button
             type="button"
             onClick={downloadCsvTemplate}
-            className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-sdu-red"
+            className="rounded-lg border border-ink-dark/20 px-3 py-2 text-center text-sm hover:border-sdu-red"
           >
             下载模板
           </button>
           <button
             type="button"
             onClick={openCreateCollectionDrawer}
-            className="px-4 py-2 rounded-lg border border-ink-dark/20 hover:border-sdu-red"
+            className="rounded-lg border border-ink-dark/20 px-4 py-2 text-center hover:border-sdu-red"
           >
             + 新增专题
           </button>
-          <label className="px-3 py-2 text-sm rounded-lg border border-ink-dark/20 hover:border-sdu-red cursor-pointer">
+          <label className="cursor-pointer rounded-lg border border-ink-dark/20 px-3 py-2 text-center text-sm hover:border-sdu-red">
             {importing ? '导入中...' : '批量导入 CSV'}
             <input type="file" accept=".csv" className="hidden" onChange={(e) => void onImportCsv(e.target.files?.[0] ?? null)} disabled={importing || !selectedCollectionId} />
           </label>
@@ -439,14 +439,14 @@ export default function QuizManager() {
             type="button"
             onClick={openCreateDrawer}
             disabled={!selectedCollectionId}
-            className="px-4 py-2 rounded-lg bg-sdu-red text-white hover:bg-sdu-red-hover disabled:opacity-50"
+            className="rounded-lg bg-sdu-red px-4 py-2 text-center text-white hover:bg-sdu-red-hover disabled:opacity-50"
           >
             + 新增题目
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-6 mb-4">
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="border border-ink-dark/10 rounded-2xl p-4 bg-paper-bg/40 h-fit">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h3 className="font-serif font-bold text-lg">专题列表</h3>
@@ -480,16 +480,16 @@ export default function QuizManager() {
                     <span>排序：{collection.sort_order}</span>
                   </div>
                 </button>
-                <div className="flex items-center gap-2 mt-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => openEditCollectionDrawer(collection)} className="px-3 py-1.5 rounded-md bg-sdu-red text-white text-xs hover:bg-sdu-red-hover">编辑</button>
                   <button type="button" onClick={() => void deleteCollection(collection.id)} className="px-3 py-1.5 rounded-md border border-red-200 text-red-700 text-xs hover:bg-red-50">删除</button>
                 </div>
                 <div className="mt-3 rounded-lg border border-ink-dark/10 bg-paper-bg/40 p-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
                     <QRCodeCanvas id={`quiz-qr-${collection.id}`} value={buildPublicQuizUrl(collection.id)} size={72} marginSize={1} />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-ink-dark">扫码答题入口</p>
-                      <p className="mt-1 truncate text-[11px] text-ink-light">{buildPublicQuizUrl(collection.id)}</p>
+                      <p className="mt-1 break-all text-[11px] text-ink-light">{buildPublicQuizUrl(collection.id)}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <button type="button" onClick={() => void copyQuizUrl(collection)} className="px-2.5 py-1.5 rounded-md border border-ink-dark/20 bg-white text-xs hover:border-sdu-red">复制链接</button>
                         <button type="button" onClick={() => downloadQrCode(collection)} className="px-2.5 py-1.5 rounded-md border border-ink-dark/20 bg-white text-xs hover:border-sdu-red">下载二维码</button>
@@ -503,9 +503,9 @@ export default function QuizManager() {
           </div>
         </aside>
 
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <div>
+        <div className="min-w-0">
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
               <h3 className="text-xl font-serif font-bold">{selectedCollection?.title ?? '请选择专题'}</h3>
               <p className="text-sm text-ink-light mt-1">{selectedCollection?.description ?? '在左侧选择专题后，可管理题目、排序和批量导入。'}</p>
             </div>
@@ -534,8 +534,10 @@ export default function QuizManager() {
               </div>
 
               {!!importReport.issues.length && (
+                <>
+                <p className="mb-2 text-xs text-ink-light sm:hidden">左右滑动查看完整表格</p>
                 <div className="overflow-x-auto border border-ink-dark/10 rounded-lg bg-white">
-                  <table className="min-w-full text-sm">
+                  <table className="min-w-[560px] text-sm">
                     <thead className="bg-gray-50 text-left">
                       <tr>
                         <th className="px-3 py-2">行号</th>
@@ -554,12 +556,14 @@ export default function QuizManager() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           )}
 
+          <p className="mb-2 text-xs text-ink-light sm:hidden">左右滑动查看完整表格</p>
           <div className="overflow-x-auto border border-ink-dark/10 rounded-lg">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[760px] text-sm">
               <thead className="bg-gray-50 text-left">
                 <tr>
                   <th className="px-3 py-2">序号</th>
@@ -623,9 +627,9 @@ export default function QuizManager() {
       )}
 
       {collectionDrawerOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/30" onClick={resetCollectionDrawer} />
-          <div className="w-full max-w-lg bg-white h-full overflow-y-auto border-l border-ink-dark/10 p-6">
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="hidden flex-1 bg-black/30 sm:block" onClick={resetCollectionDrawer} />
+          <div className="h-full w-full overflow-y-auto bg-white p-4 sm:max-w-lg sm:border-l sm:border-ink-dark/10 sm:p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-xl font-serif font-bold">{editingCollectionId ? '编辑专题' : '新增专题'}</h3>
               <button type="button" onClick={resetCollectionDrawer} className="text-ink-light hover:text-ink-dark">关闭</button>
@@ -651,7 +655,7 @@ export default function QuizManager() {
                   className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">排序</label>
                   <input
@@ -680,9 +684,9 @@ export default function QuizManager() {
       )}
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="flex-1 bg-black/30" onClick={resetDrawer} />
-          <div className="w-full max-w-xl bg-white h-full overflow-y-auto border-l border-ink-dark/10 p-6">
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="hidden flex-1 bg-black/30 sm:block" onClick={resetDrawer} />
+          <div className="h-full w-full overflow-y-auto bg-white p-4 sm:max-w-xl sm:border-l sm:border-ink-dark/10 sm:p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-xl font-serif font-bold">{editingId ? '编辑题目' : '新增题目'}</h3>
               <button type="button" onClick={resetDrawer} className="text-ink-light hover:text-ink-dark">关闭</button>
@@ -700,7 +704,7 @@ export default function QuizManager() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">所属专题</label>
                   <select
@@ -728,7 +732,7 @@ export default function QuizManager() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-sm font-medium mb-1">分值</label>
                   <input
@@ -739,7 +743,7 @@ export default function QuizManager() {
                     className="w-full px-4 py-3 rounded-lg border border-ink-dark/20"
                   />
                 </div>
-                <div />
+                <div className="hidden sm:block" />
               </div>
 
               <div>
@@ -764,10 +768,10 @@ export default function QuizManager() {
                           next[idx] = e.target.value;
                           setForm((prev) => ({ ...prev, options: next }));
                         }}
-                        className="flex-1 px-3 py-2 rounded-lg border border-ink-dark/20"
+                        className="min-w-0 flex-1 rounded-lg border border-ink-dark/20 px-3 py-2"
                         placeholder={`选项 ${idx + 1}`}
                       />
-                      <button type="button" onClick={() => removeOption(idx)} className="px-2 py-1 text-xs rounded border border-red-200 text-red-700">删除</button>
+                      <button type="button" onClick={() => removeOption(idx)} className="shrink-0 rounded border border-red-200 px-2 py-1 text-xs text-red-700">删除</button>
                     </div>
                   ))}
                 </div>
