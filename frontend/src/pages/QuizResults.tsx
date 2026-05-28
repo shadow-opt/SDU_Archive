@@ -1,27 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
 import { ensureGuestQuizToken, getQuizAuthToken } from '../services/api';
 import {
   fetchQuizCollections,
   fetchQuizQuestions,
   fetchQuizSummary,
+  isExpiredAuthError,
   toQuizErrorMessage,
   type Question,
   type QuizCollection,
   type QuizSummary,
-  type SubmissionResult,
 } from './quiz/shared';
-
-type LocationState = {
-  lastSubmission?: SubmissionResult;
-};
 
 export default function QuizResults() {
   const [quizToken, setQuizToken] = useState(() => getQuizAuthToken());
-  const location = useLocation();
   const { collectionId = '' } = useParams();
-  const state = (location.state as LocationState | null) ?? null;
   const [collections, setCollections] = useState<QuizCollection[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [summary, setSummary] = useState<QuizSummary | null>(null);
@@ -34,16 +28,26 @@ export default function QuizResults() {
   useEffect(() => {
     if (!collectionId) return;
     const controller = new AbortController();
-    void ensureGuestQuizToken()
-      .then((token) => {
+    const loadResultData = async (allowGuestRetry = true) => {
+      const token = await ensureGuestQuizToken();
+      try {
         setQuizToken(token);
         setLoading(true);
-        return Promise.all([
+        return await Promise.all([
           fetchQuizCollections(controller.signal),
           fetchQuizQuestions(collectionId, controller.signal),
           fetchQuizSummary(collectionId, controller.signal),
         ]);
-      })
+      } catch (error) {
+        if (allowGuestRetry && isExpiredAuthError(error)) {
+          const nextToken = await ensureGuestQuizToken();
+          setQuizToken(nextToken);
+          return await loadResultData(false);
+        }
+        throw error;
+      }
+    };
+    void loadResultData()
       .then(([nextCollections, nextQuestions, nextSummary]) => {
         setCollections(nextCollections);
         setQuestions(nextQuestions);
@@ -86,6 +90,7 @@ export default function QuizResults() {
   const accuracy = answeredCount > 0
     ? Math.round((summary!.answer_history.filter((item) => item.is_correct).length / answeredCount) * 100)
     : 0;
+  const latestAnswer = summary?.answer_history[0] ?? null;
 
   return (
     <div className="space-y-4 overflow-x-hidden sm:space-y-6">
@@ -107,23 +112,6 @@ export default function QuizResults() {
         </div>
       </div>
 
-      {state?.lastSubmission && (
-        <div className={[
-          'rounded-2xl border p-4 sm:p-5',
-          state.lastSubmission.correct ? 'border-green-200 bg-green-50 text-green-900' : 'border-red-200 bg-red-50 text-red-900',
-        ].join(' ')}>
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
-            <h2 className="text-lg font-semibold">最近一次提交结果</h2>
-            <span className="text-sm font-medium">
-              {state.lastSubmission.correct ? `回答正确，+${state.lastSubmission.awarded} 分` : '回答错误'}
-            </span>
-          </div>
-          <p className="text-sm">你的答案：{state.lastSubmission.selected_option}</p>
-          <p className="text-sm mt-1">正确答案：{state.lastSubmission.correct_option}</p>
-          {state.lastSubmission.explanation && <p className="text-sm mt-1">题目解析：{state.lastSubmission.explanation}</p>}
-        </div>
-      )}
-
       {notice && <InlineNotice message={notice.msg} type={notice.type} />}
       {notice?.type === 'error' && !loading && (
         <button
@@ -135,6 +123,24 @@ export default function QuizResults() {
         </button>
       )}
       {loading && <p className="text-sm text-ink-light">{quizToken ? '加载中...' : '正在进入答题...'}</p>}
+
+      {latestAnswer && (
+        <div className={[
+          'rounded-2xl border p-4 sm:p-5',
+          latestAnswer.is_correct ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900',
+        ].join(' ')}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">最近一次作答</h2>
+            <span className="text-sm font-medium">
+              {latestAnswer.is_correct ? `回答正确，+${latestAnswer.points_awarded} 分` : '回答错误'}
+            </span>
+          </div>
+          <p className="text-sm font-medium text-ink-dark">{latestAnswer.prompt}</p>
+          <p className="mt-2 text-sm">你的答案：{latestAnswer.selected_option}</p>
+          <p className="mt-1 text-sm">正确答案：{latestAnswer.correct_option}</p>
+          {latestAnswer.explanation && <p className="mt-1 text-sm text-ink-dark">题目解析：{latestAnswer.explanation}</p>}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-ink-dark/10 bg-white p-4 sm:p-5">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
 import { ensureGuestQuizToken, getQuizAuthToken } from '../services/api';
 import {
@@ -7,6 +7,7 @@ import {
   fetchQuizCollections,
   fetchQuizQuestions,
   fetchQuizSummary,
+  isExpiredAuthError,
   pickInitialQuestionId,
   submitQuizAnswer,
   toQuizErrorMessage,
@@ -14,17 +15,18 @@ import {
   type Question,
   type QuizCollection,
   type QuizSummary,
+  type SubmissionResult,
 } from './quiz/shared';
 
 export default function QuizPlay() {
   const [quizToken, setQuizToken] = useState(() => getQuizAuthToken());
-  const navigate = useNavigate();
   const { collectionId = '' } = useParams();
   const [collections, setCollections] = useState<QuizCollection[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [summary, setSummary] = useState<QuizSummary | null>(null);
   const [selectedQuestionId, setSelectedQuestionId] = useState('');
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [lastSubmission, setLastSubmission] = useState<SubmissionResult | null>(null);
   const [notice, setNotice] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,16 +37,26 @@ export default function QuizPlay() {
   useEffect(() => {
     if (!collectionId) return;
     const controller = new AbortController();
-    void ensureGuestQuizToken()
-      .then((token) => {
+    const loadQuizData = async (allowGuestRetry = true) => {
+      const token = await ensureGuestQuizToken();
+      try {
         setQuizToken(token);
         setLoading(true);
-        return Promise.all([
+        return await Promise.all([
           fetchQuizCollections(controller.signal),
           fetchQuizQuestions(collectionId, controller.signal),
           fetchQuizSummary(collectionId, controller.signal),
         ]);
-      })
+      } catch (error) {
+        if (allowGuestRetry && isExpiredAuthError(error)) {
+          const nextToken = await ensureGuestQuizToken();
+          setQuizToken(nextToken);
+          return await loadQuizData(false);
+        }
+        throw error;
+      }
+    };
+    void loadQuizData()
       .then(([nextCollections, nextQuestions, nextSummary]) => {
         const historyMap = buildHistoryMap(nextSummary);
         setCollections(nextCollections);
@@ -52,6 +64,7 @@ export default function QuizPlay() {
         setSummary(nextSummary);
         setSelectedQuestionId((currentId) => pickInitialQuestionId(nextQuestions, historyMap, currentId));
         setSelectedOption(null);
+        setLastSubmission(null);
         setNotice(null);
       })
       .catch((error) => {
@@ -78,6 +91,15 @@ export default function QuizPlay() {
     [questions, selectedQuestionId],
   );
   const selectedHistory: AnswerHistoryItem | null = selectedQuestion ? historyMap.get(selectedQuestion.id) ?? null : null;
+  const nextUnansweredQuestion = useMemo(() => {
+    const unansweredQuestions = questions.filter((question) => !historyMap.has(question.id));
+    if (!selectedQuestion) {
+      return unansweredQuestions[0] ?? null;
+    }
+    return unansweredQuestions.find((question) => question.order_index > selectedQuestion.order_index)
+      ?? unansweredQuestions[0]
+      ?? null;
+  }, [historyMap, questions, selectedQuestion]);
   const answeredCount = summary?.total_answers ?? 0;
   const totalQuestions = summary?.total_questions ?? questions.length;
   const remainingCount = Math.max(totalQuestions - answeredCount, 0);
@@ -89,10 +111,18 @@ export default function QuizPlay() {
     setNotice({ msg: '提交中...', type: 'info' });
     try {
       const result = await submitQuizAnswer(selectedQuestion.id, selectedOption);
-      navigate(`/quiz/${collectionId}/result`, {
-        state: {
-          lastSubmission: result,
-        },
+      const [nextQuestions, nextSummary] = await Promise.all([
+        fetchQuizQuestions(collectionId),
+        fetchQuizSummary(collectionId),
+      ]);
+      setQuestions(nextQuestions);
+      setSummary(nextSummary);
+      setSelectedQuestionId(result.question_id);
+      setSelectedOption(null);
+      setLastSubmission(result);
+      setNotice({
+        msg: result.correct ? `回答正确，获得 ${result.awarded} 分。` : '已提交，本题回答错误。',
+        type: result.correct ? 'success' : 'info',
       });
     } catch (error) {
       const message = toQuizErrorMessage(error, '提交失败，请稍后重试');
@@ -104,7 +134,9 @@ export default function QuizPlay() {
           ]);
           setQuestions(nextQuestions);
           setSummary(nextSummary);
+          setSelectedQuestionId(selectedQuestion.id);
           setSelectedOption(null);
+          setLastSubmission(null);
           setNotice({ msg: message, type: 'info' });
         } catch {
           setNotice({ msg: message, type: 'info' });
@@ -193,6 +225,7 @@ export default function QuizPlay() {
                   onClick={() => {
                     setSelectedQuestionId(question.id);
                     setSelectedOption(null);
+                    setLastSubmission(null);
                   }}
                   className={[
                     'w-full text-left rounded-xl border px-4 py-3 transition-colors',
@@ -223,6 +256,7 @@ export default function QuizPlay() {
                 onChange={(event) => {
                   setSelectedQuestionId(event.target.value);
                   setSelectedOption(null);
+                  setLastSubmission(null);
                 }}
                 disabled={!questions.length || loading}
               >
@@ -246,6 +280,23 @@ export default function QuizPlay() {
                 </div>
                 <p className="text-sm text-ink-light">本题分值：{selectedQuestion.points}</p>
 
+                {lastSubmission?.question_id === selectedQuestion.id && (
+                  <div
+                    className={[
+                      'rounded-xl border px-4 py-3 text-sm',
+                      lastSubmission.correct ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900',
+                    ].join(' ')}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold">{lastSubmission.correct ? `回答正确，+${lastSubmission.awarded} 分` : '回答错误'}</p>
+                      <p>当前累计 {lastSubmission.total_points} 分</p>
+                    </div>
+                    <p className="mt-2">你的答案：{lastSubmission.selected_option}</p>
+                    <p className="mt-1">正确答案：{lastSubmission.correct_option}</p>
+                    {lastSubmission.explanation && <p className="mt-1 text-ink-dark">题目解析：{lastSubmission.explanation}</p>}
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {selectedQuestion.options.map((option, index) => {
                     const checked = selectedOption === index;
@@ -264,8 +315,8 @@ export default function QuizPlay() {
                                 : 'border-ink-dark/10 bg-white text-ink-dark',
                           ].join(' ')}
                         >
-                          <span className="mt-0.5 text-xs font-semibold">
-                            {isCorrectOption ? '正确答案' : isSelectedInHistory ? '你的选择' : `选项 ${index + 1}`}
+                          <span className="mt-0.5 shrink-0 text-xs font-semibold">
+                            {isCorrectOption && isSelectedInHistory ? '正确答案 / 你的选择' : isCorrectOption ? '正确答案' : isSelectedInHistory ? '你的选择' : `选项 ${index + 1}`}
                           </span>
                           <span className="min-w-0 break-words">{option}</span>
                         </div>
@@ -289,13 +340,45 @@ export default function QuizPlay() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading || !selectedQuestion || selectedOption === null || submitting || !!selectedHistory}
-              className="w-full py-3 bg-sdu-red text-white rounded-lg font-medium hover:bg-sdu-red-hover disabled:opacity-50"
-            >
-              {selectedHistory ? '本题已作答，请前往结果页查看详情' : submitting ? '提交中...' : '提交答案并查看结果'}
-            </button>
+            {selectedHistory ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {nextUnansweredQuestion ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedQuestionId(nextUnansweredQuestion.id);
+                      setSelectedOption(null);
+                      setLastSubmission(null);
+                      setNotice(null);
+                    }}
+                    className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
+                  >
+                    继续下一题
+                  </button>
+                ) : (
+                  <Link
+                    to={`/quiz/${collectionId}/result`}
+                    className="rounded-lg bg-sdu-red px-4 py-3 text-center font-medium text-white hover:bg-sdu-red-hover"
+                  >
+                    查看完整结果
+                  </Link>
+                )}
+                <Link
+                  to={`/quiz/${collectionId}/result`}
+                  className="rounded-lg border border-ink-dark/20 px-4 py-3 text-center font-medium hover:border-sdu-red"
+                >
+                  {nextUnansweredQuestion ? '查看结果页' : '返回结果页'}
+                </Link>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                disabled={loading || !selectedQuestion || selectedOption === null || submitting}
+                className="w-full rounded-lg bg-sdu-red py-3 font-medium text-white hover:bg-sdu-red-hover disabled:opacity-50"
+              >
+                {submitting ? '提交中...' : '提交答案'}
+              </button>
+            )}
           </form>
         </section>
       </div>

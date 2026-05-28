@@ -108,3 +108,5 @@ export const submitQuizAnswer = (questionId: string, answerIndex: number) => qui
   },
   '提交失败',
 );
+
+export const isExpiredAuthError = (error: unknown) => error instanceof Error && error.message === '登录已过期，请重新登录';

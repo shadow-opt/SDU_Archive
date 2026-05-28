@@ -147,6 +147,7 @@ export const quizApiRequest = async <T>(url: string, options: ApiRequestOptions 
   if (!res.ok) {
     if (res.status === 401) {
       clearQuizGuestToken();
+      clearAuthToken();
     }
     throw new Error(await parseApiError(res, fallback, { redirectOn401To }));
   }

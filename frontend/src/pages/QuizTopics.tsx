@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import InlineNotice from '../components/InlineNotice';
 import { ensureGuestQuizToken, getQuizAuthToken } from '../services/api';
-import { fetchQuizCollections, toQuizErrorMessage, type QuizCollection } from './quiz/shared';
+import { fetchQuizCollections, isExpiredAuthError, toQuizErrorMessage, type QuizCollection } from './quiz/shared';
 
 export default function QuizTopics() {
   const [quizToken, setQuizToken] = useState(() => getQuizAuthToken());
@@ -15,12 +15,22 @@ export default function QuizTopics() {
 
   useEffect(() => {
     const controller = new AbortController();
-    void ensureGuestQuizToken()
-      .then((token) => {
+    const loadTopics = async (allowGuestRetry = true) => {
+      const token = await ensureGuestQuizToken();
+      try {
         setQuizToken(token);
         setLoading(true);
-        return fetchQuizCollections(controller.signal);
-      })
+        return await fetchQuizCollections(controller.signal);
+      } catch (error) {
+        if (allowGuestRetry && isExpiredAuthError(error)) {
+          const nextToken = await ensureGuestQuizToken();
+          setQuizToken(nextToken);
+          return await loadTopics(false);
+        }
+        throw error;
+      }
+    };
+    void loadTopics()
       .then((data) => {
         setCollections(data);
         setNotice(null);
