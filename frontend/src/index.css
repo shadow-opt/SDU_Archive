@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     @apply border-ink-dark/10;
   }
@@ -17,6 +21,101 @@
 
   ::selection {
     @apply bg-sdu-red/20 text-ink-dark;
+  }
+}
+
+.history-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 520ms ease, transform 520ms ease;
+}
+
+.history-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.history-page button,
+.history-page a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lineage-scroll {
+  scrollbar-color: rgba(242, 217, 155, 0.55) rgba(255, 255, 255, 0.08);
+  scrollbar-width: thin;
+}
+
+.lineage-node {
+  isolation: isolate;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  transition: border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+.lineage-node-accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: rgba(242, 217, 155, 0.68);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.lineage-node:hover,
+.lineage-node:focus-visible,
+.lineage-node.is-selected {
+  transform: translate(-50%, calc(-50% - 4px));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36);
+}
+
+.lineage-node.is-selected .lineage-node-accent,
+.lineage-node:hover .lineage-node-accent,
+.lineage-node:focus-visible .lineage-node-accent {
+  opacity: 1;
+}
+
+.lineage-node.is-selected {
+  border-color: #f2d99b;
+  outline: 1px solid rgba(242, 217, 155, 0.72);
+  outline-offset: 3px;
+}
+
+.lineage-node.is-connected:not(.is-selected) {
+  border-color: rgba(242, 217, 155, 0.7);
+}
+
+.lineage-path {
+  transition: stroke 180ms ease, stroke-opacity 180ms ease, stroke-width 180ms ease;
+}
+
+.lineage-path.is-active {
+  filter: drop-shadow(0 0 4px rgba(242, 217, 155, 0.5));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .history-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .lineage-node,
+  .lineage-node:hover,
+  .lineage-node:focus-visible,
+  .lineage-node.is-selected {
+    transform: translate(-50%, -50%);
   }
 }
 
