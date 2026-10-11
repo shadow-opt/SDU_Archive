@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { LogIn, LogOut, MessageSquarePlus, RotateCcw, Send, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -98,7 +99,7 @@ const getCitationTitle = (citation: Citation, index: number) => {
 };
 
 const buildCitationCopyText = (citation: Citation, index: number) => {
-  const lines = [`参考依据 ${index + 1}：${getCitationTitle(citation, index)}`, `片段摘要：${citation.snippet}`];
+  const lines = [`参考依据 ${index + 1}：${getCitationTitle(citation, index)}`, `内容摘录：${citation.snippet}`];
 
   return lines.join('\n');
 };
@@ -145,9 +146,9 @@ function CitationCard({ citation, index }: { citation: Citation; index: number }
   };
 
   return (
-    <li className="rounded-xl border border-ink-dark/10 bg-paper-bg/70 p-3 shadow-sm sm:rounded-2xl sm:p-4">
+    <li className="border-l-2 border-ink-dark/15 py-2 pl-3 sm:pl-4">
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sdu-red/10 text-xs font-semibold text-sdu-red">
+        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center bg-sdu-red/10 text-xs font-semibold text-sdu-red">
             {index + 1}
         </div>
         <div className="min-w-0 flex-1">
@@ -163,14 +164,14 @@ function CitationCard({ citation, index }: { citation: Citation; index: number }
           <button
             type="button"
             onClick={() => setExpanded((current) => !current)}
-            className="rounded-full border border-ink-dark/10 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
+            className="border border-ink-dark/15 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
           >
             {expanded ? '收起摘要' : '展开摘要'}
           </button>
           <button
             type="button"
             onClick={() => void handleCopy()}
-            className="rounded-full border border-ink-dark/10 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
+            className="border border-ink-dark/15 px-3 py-2 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red sm:py-1 sm:text-xs"
           >
             {copied ? '已复制' : '复制摘录'}
           </button>
@@ -195,8 +196,8 @@ function CitationList({ citations, degraded }: { citations: Citation[]; degraded
       </div>
 
       {degraded && (
-        <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-          当前回答基于检索片段整理，建议结合原始档案进一步核对。
+        <p className="border-l-2 border-amber-400 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+          此回答可能不完整，请结合参考依据核对。
         </p>
       )}
 
@@ -212,14 +213,14 @@ function CitationList({ citations, degraded }: { citations: Citation[]; degraded
             <button
               type="button"
               onClick={() => setShowAll((current) => !current)}
-              className="inline-flex items-center rounded-full border border-ink-dark/10 px-3 py-1.5 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
+              className="inline-flex items-center border border-ink-dark/15 px-3 py-1.5 text-xs font-medium text-ink-dark transition-colors hover:border-sdu-red/30 hover:text-sdu-red"
             >
               {showAll ? '收起其余依据' : `查看更多依据（+${citations.length - DEFAULT_VISIBLE_CITATIONS}）`}
             </button>
           )}
         </>
       ) : (
-        <p className="text-xs leading-5 text-ink-light">当前回答未返回可展示的引用摘录。</p>
+        <p className="text-xs leading-5 text-ink-light">暂无参考依据。</p>
       )}
     </div>
   );
@@ -231,10 +232,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex min-w-0 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`min-w-0 w-full max-w-[96%] rounded-2xl px-3 py-3 sm:max-w-[92%] sm:px-4 md:max-w-[82%] ${
+        className={`min-w-0 w-full max-w-[96%] rounded-md px-3 py-3 sm:max-w-[92%] sm:px-4 md:max-w-[82%] ${
           isUser
-            ? 'bg-sdu-red text-white shadow-sm'
-            : 'border border-ink-dark/10 bg-white text-ink-dark shadow-sm'
+            ? 'bg-sdu-red text-white'
+            : 'border border-ink-dark/15 bg-white text-ink-dark'
         }`}
       >
         <div className={`mb-2 flex items-center justify-between gap-3 text-xs font-medium ${isUser ? 'text-white/80' : 'text-ink-light'}`}>
@@ -247,9 +248,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         ) : (
           <>
             <MarkdownMessage content={message.content || (message.streaming ? '正在生成回答...' : '暂无内容')} />
-            {message.streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse rounded bg-sdu-red/60 align-text-bottom" />}
+            {message.streaming && <span className="ml-0.5 inline-block h-4 w-2 animate-pulse bg-sdu-red/60 align-text-bottom" />}
             {message.degraded && (
-              <p className="mt-3 text-xs leading-5 text-amber-700">当前回答基于检索片段整理，仅供参考。</p>
+              <p className="mt-3 text-xs leading-5 text-amber-700">此回答可能不完整，请结合参考依据核对。</p>
             )}
             {message.error && <p className="mt-3 text-sm text-sdu-red">{message.error}</p>}
             <CitationList citations={message.citations ?? []} degraded={message.degraded} />
@@ -276,10 +277,9 @@ export default function Home() {
   const canRetry = Boolean(token && lastSubmittedQuery && !isBusy);
 
   const pageSummary = useMemo(() => {
-    if (!token) return '正在准备游客问答会话。';
-    if (!messages.length) return '输入问题后即可开始。';
-    return activeConversationId ? '当前对话进行中。' : '已准备好开始新对话。';
-  }, [activeConversationId, messages.length, token]);
+    if (!messages.length) return '从校史脉络、人物与档案线索开始提问。';
+    return activeConversationId ? '可围绕当前话题继续追问。' : '可继续提出新问题。';
+  }, [activeConversationId, messages.length]);
 
   useEffect(() => {
     let cancelled = false;
@@ -294,7 +294,7 @@ export default function Home() {
       } catch {
         if (!cancelled) {
           setToken(getQuizAuthToken());
-          setNotice({ message: '游客会话创建失败，请稍后重试。', type: 'error' });
+          setNotice({ message: '问答服务暂未连接，请稍后重试。', type: 'error' });
         }
       }
     };
@@ -324,6 +324,7 @@ export default function Home() {
   const handleLogout = () => {
     abortRef.current?.abort();
     clearAuthToken();
+    window.dispatchEvent(new Event('authchange'));
     setIsLoggedIn(false);
     setActiveConversationId(null);
     setMessages([]);
@@ -334,7 +335,7 @@ export default function Home() {
       .then((nextToken) => setToken(nextToken))
       .catch(() => {
         setToken(null);
-        setNotice({ message: '已退出登录，游客会话创建失败，请稍后重试。', type: 'error' });
+        setNotice({ message: '已退出登录，问答服务暂时不可用。', type: 'error' });
       });
   };
 
@@ -366,7 +367,7 @@ export default function Home() {
         requestToken = await ensureGuestQuizToken();
         setToken(requestToken);
       } catch {
-        setNotice({ message: '游客会话创建失败，请稍后重试。', type: 'error' });
+        setNotice({ message: '问答服务暂未连接，请稍后重试。', type: 'error' });
         return;
       }
     }
@@ -393,7 +394,7 @@ export default function Home() {
     }
     setLastSubmittedQuery(userQuery);
     setRequestState('submitting');
-    setNotice({ message: '正在检索相关档案并生成回答…', type: 'info' });
+    setNotice({ message: '正在查阅相关资料…', type: 'info' });
 
     const updateAssistant = (updater: (message: ChatMessage) => ChatMessage) => {
       setMessages((prev) => prev.map((message) => (message.id === assistantMessageId ? updater(message) : message)));
@@ -412,7 +413,7 @@ export default function Home() {
       }
       if (payload.degraded) {
         updateAssistant((message) => ({ ...message, degraded: true }));
-        setNotice({ message: '当前回答基于检索片段整理。', type: 'info' });
+        setNotice({ message: '此回答可能不完整，请结合参考依据核对。', type: 'info' });
       }
       if (payload.error) {
         setRequestState('error');
@@ -529,12 +530,13 @@ export default function Home() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-4 overflow-x-hidden md:space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-ink-dark/10 bg-white/95 shadow-sm md:rounded-3xl">
-        <div className="bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.08),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.92))] px-4 py-4 sm:px-5 md:px-8 md:py-7">
+    <div className="mx-auto w-full max-w-6xl space-y-5 overflow-x-hidden md:space-y-8">
+      <section className="overflow-hidden rounded-lg border border-ink-dark/15 bg-white">
+        <div className="px-4 py-5 sm:px-6 md:px-8 md:py-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-5">
             <div className="max-w-3xl">
-              <h1 className="text-2xl font-serif font-bold tracking-tight text-ink-dark md:text-4xl">AI 校史问答</h1>
+              <p className="text-xs font-semibold text-sdu-red">校史档案检索</p>
+              <h1 className="mt-2 font-serif text-3xl font-bold text-ink-dark md:text-4xl">AI 问史</h1>
               <p className="mt-2 text-sm leading-6 text-ink-light md:mt-3 md:text-base">{pageSummary}</p>
             </div>
             <div className="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:gap-3">
@@ -544,32 +546,36 @@ export default function Home() {
                     type="button"
                     onClick={handleNewConversation}
                     disabled={isBusy}
-                    className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 md:px-4"
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-ink-dark/20 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 md:px-4"
                   >
+                    <MessageSquarePlus aria-hidden="true" className="h-4 w-4" />
                     新对话
                   </button>
                   {isLoggedIn ? (
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
+                    className="inline-flex items-center justify-center gap-2 rounded-md border border-ink-dark/20 px-3 py-2.5 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
                   >
+                    <LogOut aria-hidden="true" className="h-4 w-4" />
                     退出登录
                   </button>
                   ) : (
                     <Link
-                      to="/login?next=/"
-                      className="rounded-xl border border-ink-dark/15 px-3 py-2.5 text-center text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
+                      to="/login?next=/ask"
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-ink-dark/20 px-3 py-2.5 text-center text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red md:px-4"
                     >
+                      <LogIn aria-hidden="true" className="h-4 w-4" />
                       登录
                     </Link>
                   )}
                 </>
               ) : (
                 <Link
-                  to="/login?next=/"
-                  className="col-span-2 rounded-xl bg-sdu-red px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover md:col-span-1"
+                  to="/login?next=/ask"
+                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md bg-sdu-red px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover md:col-span-1"
                 >
+                  <LogIn aria-hidden="true" className="h-4 w-4" />
                   登录
                 </Link>
               )}
@@ -584,7 +590,7 @@ export default function Home() {
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="例如：山东大学的历史演变是怎样的？"
-              className="min-h-[92px] w-full resize-y rounded-xl border border-ink-dark/15 bg-white px-3.5 py-3 text-base text-ink-dark shadow-sm focus:outline-none focus:ring-2 focus:ring-sdu-red/30 disabled:cursor-not-allowed disabled:bg-gray-100 md:min-h-[120px] md:rounded-2xl md:px-4"
+              className="min-h-[92px] w-full resize-y rounded-md border border-ink-dark/20 bg-[#fbfaf7] px-3.5 py-3 text-base text-ink-dark focus:border-sdu-red focus:outline-none focus:ring-2 focus:ring-sdu-red/20 disabled:cursor-not-allowed disabled:bg-gray-100 md:min-h-[120px] md:px-4"
               disabled={!token || isBusy}
             />
 
@@ -608,38 +614,38 @@ export default function Home() {
                   type="button"
                   onClick={handleRetryLast}
                   disabled={!canRetry}
-                  className="min-w-0 rounded-xl border border-ink-dark/15 px-3 py-3 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
+                  className="inline-flex min-w-0 items-center justify-center gap-2 rounded-md border border-ink-dark/20 px-3 py-3 text-sm font-medium text-ink-dark transition-colors hover:border-sdu-red hover:text-sdu-red disabled:cursor-not-allowed disabled:opacity-60 sm:px-4"
                 >
+                  <RotateCcw aria-hidden="true" className="h-4 w-4" />
                   重试上一问
                 </button>
                 {isBusy ? (
                   <button
                     type="button"
                     onClick={handleAbort}
-                    className="min-w-0 rounded-xl border border-sdu-red/30 bg-sdu-red/5 px-3 py-3 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10 sm:px-4"
+                    className="inline-flex min-w-0 items-center justify-center gap-2 rounded-md border border-sdu-red/30 bg-sdu-red/5 px-3 py-3 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10 sm:px-4"
                   >
+                    <Square aria-hidden="true" className="h-3.5 w-3.5 fill-current" />
                     停止生成
                   </button>
                 ) : null}
                 <button
                   type="submit"
                   disabled={!token || !query.trim() || isBusy}
-                  className="col-span-2 rounded-xl bg-sdu-red px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
+                  className="col-span-2 inline-flex items-center justify-center gap-2 rounded-md bg-sdu-red px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
                 >
+                  <Send aria-hidden="true" className="h-4 w-4" />
                   {isBusy ? '生成中…' : '发送问题'}
                 </button>
               </div>
             </div>
 
-            <p className="text-xs leading-5 text-ink-light md:text-sm">
-              桌面端按 Enter 发送，Shift + Enter 换行；移动端请使用发送按钮提交。
-              {!isLoggedIn ? ' 当前以游客身份提问，登录后可切换为个人账号。' : ''}
-            </p>
+            {!isLoggedIn ? <p className="text-xs leading-5 text-ink-light md:text-sm">无需登录即可提问；登录后可使用个人账号。</p> : null}
           </form>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-ink-dark/10 bg-white shadow-sm md:rounded-3xl">
+      <section className="overflow-hidden rounded-lg border border-ink-dark/15 bg-white">
         <div className="border-b border-ink-dark/10 px-4 py-3 md:px-6 md:py-4">
           <div className="flex items-center justify-between gap-3 md:flex-row">
             <div>
@@ -647,17 +653,17 @@ export default function Home() {
               <p className="mt-1 hidden text-sm text-ink-light md:block">可查看最近的问答内容。</p>
             </div>
             <p className="shrink-0 text-xs text-ink-light md:text-sm">
-              {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : '正在准备游客会话'}
+              {messages.length ? `共 ${messages.length} 条消息` : token ? '等待你的第一个问题' : ''}
             </p>
           </div>
         </div>
 
-        <div className="max-h-none overflow-visible bg-paper-bg/60 px-3 py-4 md:max-h-[62vh] md:overflow-y-auto md:px-6 md:py-5">
+        <div className="max-h-none overflow-visible bg-[#f6f5f2] px-3 py-4 md:max-h-[62vh] md:overflow-y-auto md:px-6 md:py-5">
           {messages.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-ink-dark/20 bg-white/80 p-5 text-center shadow-sm md:rounded-2xl md:p-8">
-              <p className="text-base font-medium text-ink-dark">{token ? '还没有开始对话' : '正在准备游客会话'}</p>
+            <div className="border-y border-dashed border-ink-dark/20 bg-white/70 p-5 text-center md:p-8">
+              <p className="text-base font-medium text-ink-dark">{token ? '从一个问题开始' : '问答服务连接中'}</p>
               <p className="mt-1.5 text-sm leading-6 text-ink-light md:mt-2">
-                {token ? '可直接输入问题开始。' : '准备完成后即可使用。'}
+                {token ? '可直接输入问题。' : '连接完成后即可提问。'}
               </p>
               <div className="mt-4 flex justify-start gap-2 overflow-x-auto pb-1 md:mt-5 md:flex-wrap md:justify-center md:overflow-visible md:pb-0">
                 {token ? QUICK_PROMPTS.slice(0, 3).map((prompt) => (
@@ -671,7 +677,7 @@ export default function Home() {
                     {prompt}
                   </button>
                 )) : (
-                  <Link to="/login?next=/" className="rounded-full border border-sdu-red/20 bg-sdu-red/5 px-4 py-2 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10">
+                  <Link to="/login?next=/ask" className="border border-sdu-red/20 bg-sdu-red/5 px-4 py-2 text-sm font-medium text-sdu-red transition-colors hover:bg-sdu-red/10">
                     去登录
                   </Link>
                 )}

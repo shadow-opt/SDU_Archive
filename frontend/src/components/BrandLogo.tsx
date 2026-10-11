@@ -30,11 +30,11 @@ export default function BrandLogo({
       <img
         src="/sdu-favicon-large.png"
         alt="山东大学图标"
-        className={`h-10 w-10 shrink-0 rounded-xl border object-cover p-1 shadow-sm ${iconTone} ${iconClassName}`.trim()}
+        className={`h-10 w-10 shrink-0 rounded border object-cover p-1 ${iconTone} ${iconClassName}`.trim()}
         loading="lazy"
       />
       <div>
-        <p className={`font-serif font-bold tracking-wide ${titleTone} ${titleClassName}`.trim()}>{title}</p>
+        <p className={`font-serif font-bold ${titleTone} ${titleClassName}`.trim()}>{title}</p>
         {subtitle ? <p className={`text-sm ${subtitleTone} ${subtitleClassName}`.trim()}>{subtitle}</p> : null}
       </div>
     </div>

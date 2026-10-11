@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { ArrowLeft, BookOpen, LogIn } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import BrandLogo from '../components/BrandLogo';
 import InlineNotice from '../components/InlineNotice';
@@ -20,7 +21,7 @@ export default function UserLogin() {
   const nextPath = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const value = params.get('next');
-    return value && value.startsWith('/') ? value : '/';
+    return value && value.startsWith('/') ? value : '/ask';
   }, [location.search]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,7 +45,8 @@ export default function UserLogin() {
 
       const data = await res.json();
       localStorage.setItem('token', data.access_token);
-      setNotice({ msg: '登录成功，正在进入问答页…', type: 'success' });
+      window.dispatchEvent(new Event('authchange'));
+      setNotice({ msg: '登录成功，正在进入 AI 问史…', type: 'success' });
       navigate(nextPath, { replace: true });
     } catch (err) {
       setNotice({ msg: err instanceof Error ? err.message : '登录失败，请稍后重试', type: 'error' });
@@ -54,33 +56,32 @@ export default function UserLogin() {
   };
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-5xl items-start justify-center px-4 py-6 sm:min-h-[72vh] sm:items-center sm:py-8">
-      <div className="grid w-full max-w-4xl gap-6 rounded-[28px] border border-ink-dark/10 bg-white p-6 shadow-xl md:grid-cols-[1.05fr_0.95fr] md:p-8">
-        <div className="rounded-3xl bg-[radial-gradient(circle_at_top_left,rgba(164,25,61,0.12),transparent_42%),linear-gradient(180deg,rgba(255,248,248,0.95),rgba(255,255,255,0.98))] p-6 md:p-8 flex h-full flex-col">
+    <div className="mx-auto flex min-h-[70vh] w-full max-w-5xl items-center justify-center py-3 sm:py-6">
+      <section className="grid w-full overflow-hidden rounded-lg border border-ink-dark/15 bg-white md:grid-cols-[0.9fr_1.1fr]">
+        <div className="flex min-h-72 flex-col bg-[#173f3c] p-7 text-white md:min-h-[34rem] md:p-10">
           <BrandLogo
-            title="校史知识库"
-            subtitle="登录后使用 AI 问答"
-            stacked
-            iconClassName="h-14 w-14"
-            titleClassName="text-3xl"
+            title="山东大学校史档案"
+            subtitle="登录后进入个人问史会话"
+            theme="dark"
+            iconClassName="h-11 w-11"
+            titleClassName="text-xl"
           />
-          <p className="mt-6 text-sm leading-7 text-ink-light md:text-base">
-            登录后即可开始使用。
-          </p>
-          <div className="mt-auto pt-6 flex flex-wrap gap-3 text-sm">
-            <Link to="/" className="font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
-              返回 AI 问答
-            </Link>
-            <Link to="/quiz" className="text-ink-light transition-colors hover:text-ink-dark">
-              去互动答题
-            </Link>
+          <div className="my-auto py-10">
+            <BookOpen aria-hidden="true" className="h-8 w-8 text-white/65" />
+            <p className="mt-5 max-w-sm font-serif text-3xl font-semibold leading-snug">
+              从百年档案中，继续你的校史探索。
+            </p>
           </div>
+          <p className="text-xs leading-6 text-white/65">
+            山东大学校史档案 · AI 问史
+          </p>
         </div>
 
-        <div className="rounded-3xl border border-ink-dark/10 bg-paper-bg/60 p-6 md:p-8">
+        <div className="flex flex-col justify-center bg-[#fbfaf7] p-6 sm:p-8 md:p-12">
           <div>
-            <h1 className="text-2xl font-serif font-bold text-ink-dark">登录</h1>
-            <p className="mt-2 text-sm leading-6 text-ink-light">请输入账号信息。</p>
+            <p className="text-xs font-semibold text-sdu-red">账号验证</p>
+            <h1 className="mt-2 font-serif text-3xl font-bold text-ink-dark">登录 AI 问史</h1>
+            <p className="mt-3 text-sm leading-6 text-ink-light">请输入账号邮箱和密码。</p>
           </div>
 
           <form onSubmit={handleLogin} className="mt-8 space-y-5">
@@ -90,7 +91,7 @@ export default function UserLogin() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-ink-dark/15 bg-white px-4 py-3 transition-colors focus:border-sdu-red focus:outline-none focus:ring-2 focus:ring-sdu-red/30"
+                className="mt-2 w-full rounded-md border border-ink-dark/20 bg-white px-4 py-3 transition-colors focus:border-sdu-red focus:outline-none focus:ring-2 focus:ring-sdu-red/20"
                 placeholder="you@sdu.edu.cn"
                 required
               />
@@ -102,7 +103,7 @@ export default function UserLogin() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-ink-dark/15 bg-white px-4 py-3 transition-colors focus:border-sdu-red focus:outline-none focus:ring-2 focus:ring-sdu-red/30"
+                className="mt-2 w-full rounded-md border border-ink-dark/20 bg-white px-4 py-3 transition-colors focus:border-sdu-red focus:outline-none focus:ring-2 focus:ring-sdu-red/20"
                 required
               />
             </label>
@@ -112,13 +113,24 @@ export default function UserLogin() {
             <button
               type="submit"
               disabled={loggingIn}
-              className="w-full rounded-xl bg-sdu-red px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-sdu-red px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-sdu-red-hover disabled:opacity-60"
             >
+              <LogIn aria-hidden="true" className="h-4 w-4" />
               {loggingIn ? '登录中…' : '登录并进入问答'}
             </button>
           </form>
+
+          <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 border-t border-ink-dark/15 pt-5 text-sm">
+            <Link to="/" className="inline-flex items-center gap-1.5 font-medium text-sdu-red transition-colors hover:text-sdu-red-hover">
+              <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+              返回校史
+            </Link>
+            <Link to="/ask" className="text-ink-light transition-colors hover:text-ink-dark">
+              返回 AI 问史
+            </Link>
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

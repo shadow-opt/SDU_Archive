@@ -5,7 +5,8 @@ import './index.css'
 
 import PublicLayout from './components/PublicLayout'
 import AdminLayout from './components/AdminLayout'
-import Home from './pages/Home'
+import HistoryHome from './pages/HistoryHome'
+import Ask from './pages/Home'
 import UserLogin from './pages/UserLogin'
 import QuizTopics from './pages/QuizTopics'
 import QuizPlay from './pages/QuizPlay'
@@ -23,7 +24,8 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<PublicLayout />}>
-          <Route index element={<Home />} />
+          <Route index element={<HistoryHome />} />
+          <Route path="ask" element={<Ask />} />
           <Route path="login" element={<UserLogin />} />
           <Route path="quiz" element={<QuizTopics />} />
           <Route path="quiz/:collectionId" element={<QuizPlay />} />

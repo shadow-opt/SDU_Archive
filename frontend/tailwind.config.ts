@@ -19,8 +19,8 @@ export default {
         'ink-light': '#4A4A4C',
       },
       fontFamily: {
-        sans: ['"Noto Sans SC"', 'system-ui', 'sans-serif'],
-        serif: ['"Noto Serif SC"', 'serif'],
+        sans: ['"Noto Sans SC"', '"PingFang SC"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
+        serif: ['"Noto Serif SC"', '"Source Han Serif SC"', '"Songti SC"', 'STSong', 'SimSun', 'serif'],
       }
     },
   },
